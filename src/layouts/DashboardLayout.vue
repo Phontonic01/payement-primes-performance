@@ -3,24 +3,52 @@ import {
   Truck, MapPin, Wrench, ShieldCheck, Settings, LogOut,
   LayoutDashboard, ClipboardList, Route, History,
   CheckCircle, Wine, Recycle, Users, SlidersHorizontal,
-  FileCheck, FileSpreadsheet, ChevronDown, Menu, X, Leaf
+  FileCheck, FileSpreadsheet, ChevronDown, Menu, X,
+  Search, ChevronRight
 } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
+import { useRoute } from 'vue-router'
 
 const authStore = useAuthStore()
+const route = useRoute()
 const sidebarOpen = ref(true)
+const sidebarMobileOpen = ref(false)
 const expandedGroup = ref(null)
+
+// Close mobile sidebar on route change
+watch(() => route.path, () => {
+  sidebarMobileOpen.value = false
+})
 
 function toggleGroup(group) {
   expandedGroup.value = expandedGroup.value === group ? null : group
 }
+
+// Section root mapping for breadcrumb links
+const sectionRoots = {
+  'Collecte': '/collecte/tonnage',
+  'Géolocalisation': '/geo/validation',
+  'Logistique': '/logistique/entretien',
+  'QHSE': '/qhse/checklist',
+  'Administration': '/admin/utilisateurs',
+}
+
+const breadcrumbs = computed(() => {
+  const crumbs = route.meta.breadcrumb || [route.meta.title || route.name]
+  return crumbs.map((label, index) => ({
+    label,
+    isLast: index === crumbs.length - 1,
+    to: index === 0 && crumbs.length > 1 ? sectionRoots[label] || null : null,
+  }))
+})
 
 const navGroups = computed(() => [
   {
     id: 'main',
     items: [
       { name: 'Tableau de bord', to: '/', icon: LayoutDashboard, show: true },
+      { name: 'Recherche Agent', to: '/recherche', icon: Search, show: true },
     ]
   },
   {
@@ -87,26 +115,45 @@ const currentMonth = new Date().toLocaleDateString('fr-FR', { month: 'long', yea
 
 <template>
   <div class="flex h-screen bg-background antialiased">
+    <!-- Mobile backdrop -->
+    <Transition name="backdrop">
+      <div
+        v-if="sidebarMobileOpen"
+        class="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm lg:hidden"
+        @click="sidebarMobileOpen = false"
+      ></div>
+    </Transition>
+
     <!-- Sidebar -->
     <aside
-      :class="[sidebarOpen ? 'w-64' : 'w-16', 'bg-sidebar flex flex-col shadow-xl']"
-      class="transition-all duration-300 ease-in-out"
+      :class="[
+        sidebarOpen ? 'lg:w-64' : 'lg:w-16',
+        sidebarMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
+      ]"
+      class="fixed inset-y-0 left-0 z-50 w-64 bg-sidebar flex flex-col shadow-xl transition-all duration-300 ease-in-out lg:static lg:z-auto"
     >
       <!-- Logo -->
-      <div class="h-16 flex items-center px-4 border-b border-white/10">
+      <div class="h-16 flex items-center justify-between px-4 border-b border-white/10">
         <div class="flex items-center gap-3">
-          <div class="w-9 h-9 bg-emerald-400/20 rounded-lg flex items-center justify-center flex-shrink-0">
-            <Leaf class="w-5 h-5 text-emerald-400" />
+          <div class="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden bg-white">
+            <img src="/logo-clean-africa.jpg" alt="Clean Africa" class="w-full h-full object-contain" />
           </div>
-          <div v-if="sidebarOpen" class="overflow-hidden">
+          <div v-if="sidebarOpen || sidebarMobileOpen" class="overflow-hidden">
             <h1 class="text-white font-bold text-sm tracking-wide leading-tight">CLEAN AFRICA</h1>
             <p class="text-emerald-300/70 text-[10px] font-medium tracking-widest uppercase">Primes Performance</p>
           </div>
         </div>
+        <!-- Close button on mobile -->
+        <button
+          @click="sidebarMobileOpen = false"
+          class="lg:hidden text-gray-400 hover:text-white cursor-pointer"
+        >
+          <X class="w-5 h-5" />
+        </button>
       </div>
 
       <!-- User info -->
-      <div v-if="sidebarOpen" class="px-4 py-3 border-b border-white/10">
+      <div v-if="sidebarOpen || sidebarMobileOpen" class="px-4 py-3 border-b border-white/10">
         <div class="flex items-center gap-3">
           <div class="w-8 h-8 rounded-full bg-emerald-500/30 flex items-center justify-center text-emerald-300 text-xs font-bold flex-shrink-0">
             {{ authStore.user?.name?.charAt(0)?.toUpperCase() || '?' }}
@@ -135,13 +182,13 @@ const currentMonth = new Date().toLocaleDateString('fr-FR', { month: 'long', yea
                 : 'text-gray-300 hover:bg-white/5 hover:text-white']"
             >
               <component :is="item.icon" class="w-5 h-5 flex-shrink-0" />
-              <span v-if="sidebarOpen">{{ item.name }}</span>
+              <span v-if="sidebarOpen || sidebarMobileOpen">{{ item.name }}</span>
             </router-link>
           </template>
 
           <!-- Grouped items -->
           <template v-else>
-            <div v-if="sidebarOpen" class="pt-2">
+            <div v-if="sidebarOpen || sidebarMobileOpen" class="pt-2">
               <button
                 @click="toggleGroup(group.id)"
                 class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold uppercase tracking-wider cursor-pointer"
@@ -187,7 +234,7 @@ const currentMonth = new Date().toLocaleDateString('fr-FR', { month: 'long', yea
           class="flex w-full items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-400 hover:bg-red-500/10 cursor-pointer"
         >
           <LogOut class="w-5 h-5 flex-shrink-0" />
-          <span v-if="sidebarOpen">Déconnexion</span>
+          <span v-if="sidebarOpen || sidebarMobileOpen">Déconnexion</span>
         </button>
       </div>
     </aside>
@@ -195,19 +242,46 @@ const currentMonth = new Date().toLocaleDateString('fr-FR', { month: 'long', yea
     <!-- Main Content -->
     <main class="flex-1 flex flex-col overflow-hidden">
       <!-- Topbar -->
-      <header class="h-14 bg-white border-b border-border flex items-center justify-between px-6 shadow-sm z-10">
-        <div class="flex items-center gap-4">
-          <button @click="sidebarOpen = !sidebarOpen" class="text-gray-500 hover:text-gray-700 cursor-pointer">
+      <header class="h-14 bg-white border-b border-border flex items-center justify-between px-4 sm:px-6 shadow-sm z-10">
+        <div class="flex items-center gap-3">
+          <!-- Mobile hamburger -->
+          <button
+            @click="sidebarMobileOpen = true"
+            class="lg:hidden text-gray-500 hover:text-gray-700 cursor-pointer"
+          >
+            <Menu class="w-5 h-5" />
+          </button>
+          <!-- Desktop sidebar toggle -->
+          <button
+            @click="sidebarOpen = !sidebarOpen"
+            class="hidden lg:block text-gray-500 hover:text-gray-700 cursor-pointer"
+          >
             <Menu v-if="!sidebarOpen" class="w-5 h-5" />
             <X v-else class="w-5 h-5" />
           </button>
-          <div>
-            <h2 class="text-base font-semibold text-gray-900">{{ $route.meta.title || $route.name }}</h2>
-          </div>
+          <!-- Breadcrumbs -->
+          <nav class="flex items-center text-sm" aria-label="Breadcrumb">
+            <template v-for="(crumb, index) in breadcrumbs" :key="index">
+              <ChevronRight v-if="index > 0" class="w-3.5 h-3.5 text-gray-400 mx-1.5 flex-shrink-0" />
+              <router-link
+                v-if="crumb.to && !crumb.isLast"
+                :to="crumb.to"
+                class="text-gray-500 hover:text-emerald-600 font-medium transition-colors"
+              >
+                {{ crumb.label }}
+              </router-link>
+              <span
+                v-else
+                :class="crumb.isLast ? 'text-gray-900 font-semibold' : 'text-gray-500 font-medium'"
+              >
+                {{ crumb.label }}
+              </span>
+            </template>
+          </nav>
         </div>
         <div class="flex items-center gap-4">
-          <span class="text-sm text-gray-500 font-medium capitalize">{{ currentMonth }}</span>
-          <div class="h-6 w-px bg-gray-200"></div>
+          <span class="hidden sm:inline text-sm text-gray-500 font-medium capitalize">{{ currentMonth }}</span>
+          <div class="h-6 w-px bg-gray-200 hidden sm:block"></div>
           <div class="flex items-center gap-2">
             <div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
             <span class="text-xs text-gray-500">En ligne</span>
@@ -215,7 +289,7 @@ const currentMonth = new Date().toLocaleDateString('fr-FR', { month: 'long', yea
         </div>
       </header>
 
-      <!-- Content -->
+      <!-- Content with page transition -->
       <div class="flex-1 overflow-y-auto p-6 bg-background">
         <div class="max-w-7xl mx-auto">
           <slot></slot>
@@ -224,3 +298,14 @@ const currentMonth = new Date().toLocaleDateString('fr-FR', { month: 'long', yea
     </main>
   </div>
 </template>
+
+<style scoped>
+.backdrop-enter-active,
+.backdrop-leave-active {
+  transition: opacity 0.2s ease;
+}
+.backdrop-enter-from,
+.backdrop-leave-to {
+  opacity: 0;
+}
+</style>

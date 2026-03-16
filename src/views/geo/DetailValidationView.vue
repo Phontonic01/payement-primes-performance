@@ -5,6 +5,9 @@ import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import { ArrowLeft, MapPin, CheckCircle, AlertTriangle, XCircle } from 'lucide-vue-next'
+import { useToastStore } from '@/stores/toast'
+
+const toastStore = useToastStore()
 
 const route = useRoute()
 const router = useRouter()
@@ -14,10 +17,10 @@ const justification = ref('')
 
 function valider(statut) {
   if (statut !== 'VALIDE' && !justification.value) {
-    alert('Une justification est obligatoire pour un refus ou un bouclage partiel.')
+    toastStore.addToast('Une justification est obligatoire pour un refus ou un bouclage partiel.', 'warning')
     return
   }
-  alert(`Bouclage ${statut} avec succès.`)
+  toastStore.addToast(`Bouclage ${statut} avec succès.`, 'success')
   router.push('/geo/validation')
 }
 </script>
@@ -48,7 +51,7 @@ function valider(statut) {
             </div>
             <div>
               <dt class="font-medium text-gray-500">Agent</dt>
-              <dd class="mt-1 font-semibold text-gray-900">Jean MOUSSAVOU</dd>
+              <dd class="mt-1 font-semibold text-gray-900">Medza Ondo Scheila</dd>
             </div>
             <div>
               <dt class="font-medium text-gray-500">Circuit assigne</dt>

@@ -5,6 +5,10 @@ import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
+import AgentSearchInput from '@/components/ui/AgentSearchInput.vue'
+import { useToastStore } from '@/stores/toast'
+
+const toastStore = useToastStore()
 
 const form = ref({
   date: new Date().toISOString().split('T')[0],
@@ -17,14 +21,14 @@ const form = ref({
 
 function submitForm() {
   if (!form.value.agent) {
-    alert('Veuillez sélectionner un agent.')
+    toastStore.addToast('Veuillez sélectionner un agent.', 'warning')
     return
   }
 
   if (form.value.resultat === 'POSITIF') {
-    alert(`ATTENTION: Alcootest positif enregistré (${form.value.taux} g/l). Pénalité de 5 points appliquée. Note administrative potentielle.`)
+    toastStore.addToast(`ATTENTION: Alcootest positif enregistré (${form.value.taux} g/l). Pénalité de 5 points appliquée. Note administrative potentielle.`, 'warning', 6000)
   } else {
-    alert('Alcootest négatif enregistré avec succès.')
+    toastStore.addToast('Alcootest négatif enregistré avec succès.', 'success')
   }
 
   // Reset
@@ -57,19 +61,13 @@ function submitForm() {
         </div>
 
         <!-- Agent Select -->
-        <div class="space-y-1.5">
-          <label class="block text-sm font-medium text-gray-900">Agent contrôlé *</label>
-          <select
-            v-model="form.agent"
-            required
-            class="block w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-gray-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-colors"
-          >
-            <option value="">Sélectionner un agent</option>
-            <option value="ID_1">Jean MOUSSAVOU</option>
-            <option value="ID_2">Paul ONDO</option>
-            <option value="ID_3">Kevin MVOUMA</option>
-          </select>
-        </div>
+        <AgentSearchInput
+          v-model="form.agent"
+          :date="form.date"
+          :filter-presents="true"
+          label="Agent contrôlé"
+          required
+        />
 
         <!-- Test Result -->
         <div class="border-t border-gray-100 pt-6">

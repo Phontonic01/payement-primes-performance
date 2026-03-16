@@ -1,9 +1,13 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { Play, CheckCircle } from 'lucide-vue-next'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
+import { useAgentsStore } from '@/stores/agents'
+
+const agentsStore = useAgentsStore()
+const nbAgents = computed(() => agentsStore.agents.length)
 
 const mois = ref('2025-12')
 const estConsolide = ref(false)
@@ -84,8 +88,8 @@ function lancerMoteur() {
           <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-emerald-100 mb-4">
             <CheckCircle class="w-6 h-6 text-emerald-600" />
           </div>
-          <p class="text-lg text-gray-700 mb-2"><strong>154</strong> agents traités avec succès.</p>
-          <p class="text-sm text-gray-500 mb-6">Total des primes calculées (brouillon) : <strong class="text-gray-900">12,450,000 FCFA</strong></p>
+          <p class="text-lg text-gray-700 mb-2"><strong>{{ nbAgents }}</strong> agents traités avec succès.</p>
+          <p class="text-sm text-gray-500 mb-6">Total des primes calculées (brouillon) : <strong class="text-gray-900">En attente de validation</strong></p>
 
           <BaseButton @click="$router.push('/admin/validation')" variant="outline" class="border-emerald-200 text-emerald-700 hover:bg-emerald-50">
             Passer à la validation finale &rarr;

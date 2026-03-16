@@ -4,6 +4,10 @@ import { Recycle, Info, Save, ArrowLeft } from 'lucide-vue-next'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import AgentSearchInput from '@/components/ui/AgentSearchInput.vue'
+import { useToastStore } from '@/stores/toast'
+
+const toastStore = useToastStore()
 
 const form = ref({
   date: new Date().toISOString().split('T')[0],
@@ -16,11 +20,11 @@ const form = ref({
 
 function validerPesee() {
   if (!form.value.agent || !form.value.circuit) {
-    alert('Veuillez renseigner l\'agent et le circuit.')
+    toastStore.addToast('Veuillez renseigner l\'agent et le circuit.', 'warning')
     return
   }
   const total = Number(form.value.peseePlastique) + Number(form.value.peseeCarton) + Number(form.value.peseeAutre)
-  alert(`Pesée enregistrée. Total sélectif: ${total} kg. Bonus applicable selon barème.`)
+  toastStore.addToast(`Pesée enregistrée. Total sélectif: ${total} kg. Bonus applicable selon barème.`, 'success')
 
   // Reset
   form.value.peseePlastique = 0
@@ -58,17 +62,14 @@ function validerPesee() {
         <!-- Date & Agent -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
           <BaseInput v-model="form.date" type="date" label="Date de pesée" required />
-          <div class="space-y-1.5">
-            <label class="block text-sm font-medium text-gray-900">Agent bénéficiaire *</label>
-            <select
+          <div>
+            <AgentSearchInput
               v-model="form.agent"
+              :date="form.date"
+              :filter-presents="true"
+              label="Agent bénéficiaire"
               required
-              class="block w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-gray-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-colors"
-            >
-              <option value="">Sélectionner un agent</option>
-              <option value="ID_1">Jean MOUSSAVOU</option>
-              <option value="ID_3">Kevin MVOUMA</option>
-            </select>
+            />
           </div>
         </div>
 

@@ -13,9 +13,9 @@ const columns = [
 ]
 
 const historiques = [
-  { id: 1, date: '2025-12-09', agent: 'Jean MOUSSAVOU', circuit: 'PK8 - PK12', statut: 'VALIDE', justification: '-' },
-  { id: 2, date: '2025-12-09', agent: 'Paul ONDO', circuit: 'Owendo Port', statut: 'PARTIEL', justification: 'Deviation rue 3 non couverte' },
-  { id: 3, date: '2025-12-08', agent: 'Marie NDONG', circuit: 'Akanda', statut: 'REFUSE', justification: 'Panne GPS signalee a 10h' },
+  { id: 1, date: '2025-12-09', agent: 'Medza Ondo Scheila', circuit: 'PK8 - PK12', statut: 'VALIDE', justification: '-' },
+  { id: 2, date: '2025-12-09', agent: 'Mamfoumbi Muriella', circuit: 'Owendo Port', statut: 'PARTIEL', justification: 'Deviation rue 3 non couverte' },
+  { id: 3, date: '2025-12-08', agent: 'Maduka Tiburce', circuit: 'Akanda', statut: 'REFUSE', justification: 'Panne GPS signalee a 10h' },
 ]
 </script>
 

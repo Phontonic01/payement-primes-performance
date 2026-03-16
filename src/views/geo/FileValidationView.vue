@@ -17,8 +17,8 @@ const columns = [
 ]
 
 const files = [
-  { id: 1, date: '2025-12-10', agent: 'Jean MOUSSAVOU', circuit: 'PK8 - PK12', declare: 'OUI', statut: 'ATTENTE' },
-  { id: 2, date: '2025-12-10', agent: 'Paul ONDO', circuit: 'Owendo Port', declare: 'OUI', statut: 'ATTENTE' }
+  { id: 1, date: '2025-12-10', agent: 'Medza Ondo Scheila', circuit: 'PK8 - PK12', declare: 'OUI', statut: 'ATTENTE' },
+  { id: 2, date: '2025-12-10', agent: 'Mamfoumbi Muriella', circuit: 'Owendo Port', declare: 'OUI', statut: 'ATTENTE' }
 ]
 
 function voirDetails(id) {

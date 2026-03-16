@@ -4,6 +4,9 @@ import { AlertTriangle } from 'lucide-vue-next'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import { useToastStore } from '@/stores/toast'
+
+const toastStore = useToastStore()
 
 const params = ref({
   prixTonne: 500,
@@ -15,7 +18,7 @@ const params = ref({
 })
 
 function saveParams() {
-  alert('Paramètres de calcul enregistrés avec succès. Ils s\'appliqueront sur la prochaine consolidation.')
+  toastStore.addToast('Paramètres de calcul enregistrés avec succès. Ils s\'appliqueront sur la prochaine consolidation.', 'success')
 }
 </script>
 
@@ -38,7 +41,7 @@ function saveParams() {
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <BaseCard title="Axe 1: Tonnage">
           <div class="space-y-4">
-            <BaseInput v-model.number="params.prixTonne" type="number" label="Taux de base par Tonne (FCFA)" required />
+            <BaseInput v-model.number="params.prixTonne" type="number" label="Taux de base par Tonne (XAF)" required />
             <p class="text-xs text-gray-500">Coefficient multiplicateur appliqué au tonnage net du mois de l'agent.</p>
           </div>
         </BaseCard>
@@ -60,13 +63,13 @@ function saveParams() {
         <BaseCard title="Axe 4: QHSE & Bonus">
           <div class="space-y-4">
             <BaseInput v-model.number="params.penaliteQhse" type="number" min="0" label="Pénalité par défaut Alcootest (pts)" required />
-            <BaseInput v-model.number="params.bonusSelective" type="number" min="0" label="Bonus par tranche 10kg sélectif (FCFA)" required />
+            <BaseInput v-model.number="params.bonusSelective" type="number" min="0" label="Bonus par tranche 10kg sélectif (XAF)" required />
           </div>
         </BaseCard>
 
         <BaseCard title="Plafonds et Limites" class="md:col-span-2">
           <div class="space-y-4 max-w-sm">
-            <BaseInput v-model.number="params.montantMaxPrime" type="number" label="Plafond global de prime (FCFA)" required />
+            <BaseInput v-model.number="params.montantMaxPrime" type="number" label="Plafond global de prime (XAF)" required />
             <p class="text-xs text-gray-500">Aucune prime ne pourra dépasser ce montant mensuel, quels que soient les scores.</p>
           </div>
         </BaseCard>

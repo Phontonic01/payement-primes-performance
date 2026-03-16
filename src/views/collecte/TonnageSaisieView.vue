@@ -3,15 +3,17 @@ import { ref, computed } from 'vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import AgentSearchInput from '@/components/ui/AgentSearchInput.vue'
 import { Truck, Weight, RotateCcw, Calendar, User, Gauge } from 'lucide-vue-next'
+import { useToastStore } from '@/stores/toast'
+
+const toastStore = useToastStore()
 
 const agent = ref('')
 const vehiculeType = ref('BOM')
 const date = ref(new Date().toISOString().split('T')[0])
 const tonnage = ref('')
 const rotations = ref('')
-
-const agents = ['Jean MOUSSAVOU', 'Marie NDONG', 'Paul ONDO']
 const vehicules = ['BOM', 'Plateaux', 'Bennes', 'Movi', 'Canter']
 
 // Mock calculation based on specs
@@ -34,7 +36,7 @@ const scoreEstime = computed(() => {
 })
 
 function submit() {
-  alert('Tonnage enregistre. (Simulation)')
+  toastStore.addToast('Tonnage enregistré avec succès. (Simulation)', 'success')
   tonnage.value = ''
   rotations.value = ''
 }
@@ -58,7 +60,7 @@ function submit() {
     <div class="bg-white rounded-xl border border-gray-100 overflow-hidden">
       <div class="px-6 py-4 border-b border-gray-100 flex items-center gap-3">
         <div class="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center">
-          <Weight class="w-4.5 h-4.5 text-emerald-600" />
+          <Weight class="w-5 h-5 text-emerald-600" />
         </div>
         <div>
           <h3 class="text-sm font-semibold text-gray-900">Nouveau releve</h3>
@@ -70,17 +72,13 @@ function submit() {
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
           <!-- Agent selector -->
           <div>
-            <label class="flex items-center gap-1.5 text-sm font-medium text-gray-700 mb-2">
-              <User class="w-3.5 h-3.5 text-gray-400" />
-              Agent (Chauffeur)
-            </label>
-            <select
+            <AgentSearchInput
               v-model="agent"
-              class="block w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-colors duration-200"
-            >
-              <option value="" disabled>Selectionner un agent...</option>
-              <option v-for="a in agents" :key="a" :value="a">{{ a }}</option>
-            </select>
+              :date="date"
+              :filter-presents="true"
+              label="Agent (Chauffeur)"
+              required
+            />
           </div>
 
           <!-- Vehicle type -->

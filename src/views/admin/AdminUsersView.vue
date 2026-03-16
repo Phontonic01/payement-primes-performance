@@ -15,11 +15,14 @@ const columns = [
 ]
 
 const users = ref([
-  { id: 1, nom: 'Jean MOUSSAVOU', role: 'CHAUFFEUR', matricule: 'CA-1001', zone: 'PK8', statut: 'ACTIF' },
-  { id: 2, nom: 'Paul ONDO', role: 'CHAUFFEUR', matricule: 'CA-1002', zone: 'LIBREVILLE', statut: 'ACTIF' },
-  { id: 3, nom: 'Kevin MVOUMA', role: 'EQUIPIER', matricule: 'CA-2001', zone: 'OWENDO', statut: 'ACTIF' },
-  { id: 4, nom: 'Marie NDONG', role: 'GEO', matricule: 'CA-3001', zone: 'SIEGE', statut: 'ACTIF' },
-  { id: 5, nom: 'Alice ZANG', role: 'COLLECTE', matricule: 'CA-4001', zone: 'SIEGE', statut: 'INACTIF' },
+  { id: 1, nom: 'Medza Ondo Scheila', role: 'CHAUFFEUR', matricule: '2823', zone: 'PK8', statut: 'ACTIF' },
+  { id: 2, nom: 'Mamfoumbi Muriella', role: 'CHAUFFEUR', matricule: '2948', zone: 'LIBREVILLE', statut: 'ACTIF' },
+  { id: 3, nom: 'Mbatsi Davy', role: 'EQUIPIER', matricule: '0946', zone: 'OWENDO', statut: 'ACTIF' },
+  { id: 4, nom: 'Maduka Tiburce', role: 'GEO', matricule: '1495', zone: 'SIEGE', statut: 'ACTIF' },
+  { id: 5, nom: 'Mbele Christopher', role: 'COLLECTE', matricule: '3016', zone: 'SIEGE', statut: 'ACTIF' },
+  { id: 6, nom: 'Tsamba Tchewarny', role: 'CHAUFFEUR', matricule: '0943', zone: 'OWENDO', statut: 'ACTIF' },
+  { id: 7, nom: 'Beka Christ', role: 'EQUIPIER', matricule: '2024', zone: 'LIBREVILLE', statut: 'ACTIF' },
+  { id: 8, nom: 'Tengou Joram', role: 'CHAUFFEUR', matricule: '2768', zone: 'LIBREVILLE', statut: 'ACTIF' },
 ])
 
 const showModal = ref(false)

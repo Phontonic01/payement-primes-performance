@@ -4,6 +4,10 @@ import { ClipboardCheck, ShieldCheck, Truck, Save, ArrowLeft, AlertTriangle } fr
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import AgentSearchInput from '@/components/ui/AgentSearchInput.vue'
+import { useToastStore } from '@/stores/toast'
+
+const toastStore = useToastStore()
 
 const form = ref({
   date: new Date().toISOString().split('T')[0],
@@ -60,10 +64,10 @@ const scoreBg = computed(() => {
 
 function submitForm() {
   if (!form.value.agent) {
-    alert('Veuillez sélectionner un agent.')
+    toastStore.addToast('Veuillez sélectionner un agent.', 'warning')
     return
   }
-  alert(`Checklist enregistrée. Score santé sécurité: ${scoreQhse.value.toFixed(2)}/5`)
+  toastStore.addToast(`Checklist enregistrée. Score santé sécurité: ${scoreQhse.value.toFixed(2)}/5`, 'success')
   // Reset simulation
   form.value.agent = ''
   form.value.observations = ''
@@ -89,17 +93,14 @@ function submitForm() {
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
           <BaseInput v-model="form.date" type="date" label="Date de contrôle" required />
 
-          <div class="space-y-1.5">
-            <label class="block text-sm font-medium text-gray-900">Agent contrôlé *</label>
-            <select
+          <div>
+            <AgentSearchInput
               v-model="form.agent"
+              :date="form.date"
+              :filter-presents="true"
+              label="Agent contrôlé"
               required
-              class="block w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-gray-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-colors"
-            >
-              <option value="">Sélectionner un agent</option>
-              <option value="ID_1">Jean MOUSSAVOU (Chauffeur)</option>
-              <option value="ID_3">Kevin MVOUMA (Équipier)</option>
-            </select>
+            />
           </div>
         </div>
 

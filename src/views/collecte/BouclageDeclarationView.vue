@@ -16,9 +16,9 @@ const columns = [
 ]
 
 const circuits = ref([
-  { id: 1, agent: 'Jean MOUSSAVOU', vehicule: 'BOM (1234AB)', circuit: 'PK8 - PK12', statut_geo: 'EN_ATTENTE_GEO', bouclage_declare: null },
-  { id: 2, agent: 'Paul ONDO', vehicule: 'Plateaux (5678CD)', circuit: 'Owendo Port', statut_geo: 'NON_SAISI', bouclage_declare: null },
-  { id: 3, agent: 'Marie NDONG', vehicule: 'Canter (9012EF)', circuit: 'Akanda Centre', statut_geo: 'VALIDE', bouclage_declare: true },
+  { id: 1, agent: 'Medza Ondo Scheila', vehicule: 'BOM (1234AB)', circuit: 'PK8 - PK12', statut_geo: 'EN_ATTENTE_GEO', bouclage_declare: null },
+  { id: 2, agent: 'Mamfoumbi Muriella', vehicule: 'Plateaux (5678CD)', circuit: 'Owendo Port', statut_geo: 'NON_SAISI', bouclage_declare: null },
+  { id: 3, agent: 'Maduka Tiburce', vehicule: 'Canter (9012EF)', circuit: 'Akanda Centre', statut_geo: 'VALIDE', bouclage_declare: true },
 ])
 
 function declarer(id, estBoucle) {
@@ -50,7 +50,7 @@ function declarer(id, estBoucle) {
     <div class="bg-white rounded-xl border border-gray-100 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
       <div class="flex items-center gap-3">
         <div class="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center">
-          <Route class="w-4.5 h-4.5 text-emerald-600" />
+          <Route class="w-5 h-5 text-emerald-600" />
         </div>
         <div>
           <h3 class="text-sm font-semibold text-gray-900">Circuits du jour</h3>

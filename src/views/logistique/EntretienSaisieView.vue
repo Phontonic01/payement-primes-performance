@@ -3,7 +3,11 @@ import { ref, computed } from 'vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import AgentSearchInput from '@/components/ui/AgentSearchInput.vue'
 import { ClipboardCheck, Gauge } from 'lucide-vue-next'
+import { useToastStore } from '@/stores/toast'
+
+const toastStore = useToastStore()
 
 const form = ref({
   date: new Date().toISOString().split('T')[0],
@@ -22,10 +26,10 @@ const scoreEntretien = computed(() => {
 
 function submitForm() {
   if (!form.value.agent || !form.value.vehicule) {
-    alert('Veuillez remplir tous les champs obligatoires.')
+    toastStore.addToast('Veuillez remplir tous les champs obligatoires.', 'warning')
     return
   }
-  alert(`Fiche d'entretien enregistrée. Score moyen: ${scoreEntretien.value}/10`)
+  toastStore.addToast(`Fiche d'entretien enregistrée. Score moyen: ${scoreEntretien.value}/10`, 'success')
   // Reset
   form.value = {
     date: new Date().toISOString().split('T')[0],
@@ -57,17 +61,14 @@ function submitForm() {
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <BaseInput v-model="form.date" type="date" label="Date d'evaluation" required />
 
-            <div class="space-y-1.5">
-              <label class="block text-sm font-medium text-gray-900">Chauffeur evalue <span class="text-red-500">*</span></label>
-              <select
+            <div>
+              <AgentSearchInput
                 v-model="form.agent"
+                :date="form.date"
+                :filter-presents="true"
+                label="Chauffeur évalué"
                 required
-                class="block w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-gray-900 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-colors"
-              >
-                <option value="">Selectionner un agent</option>
-                <option value="ID_1">Jean MOUSSAVOU</option>
-                <option value="ID_2">Paul ONDO</option>
-              </select>
+              />
             </div>
 
             <div class="space-y-1.5">
