@@ -1,16 +1,18 @@
 <script setup>
 import {
-  Truck, MapPin, Wrench, ShieldCheck, Settings, LogOut,
+  Truck, MapPin, Wrench, ShieldCheck, LogOut, Landmark,
   LayoutDashboard, ClipboardList, Route, History,
   CheckCircle, Wine, Recycle, Users, SlidersHorizontal,
   FileCheck, FileSpreadsheet, ChevronDown, Menu, X,
-  Search, ChevronRight
+  Search, ChevronRight, Sun, Moon
 } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
+import { useThemeStore } from '@/stores/theme'
 import { ref, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
 const authStore = useAuthStore()
+const themeStore = useThemeStore()
 const route = useRoute()
 const sidebarOpen = ref(true)
 const sidebarMobileOpen = ref(false)
@@ -28,10 +30,10 @@ function toggleGroup(group) {
 // Section root mapping for breadcrumb links
 const sectionRoots = {
   'Collecte': '/collecte/tonnage',
-  'Géolocalisation': '/geo/validation',
+  'Géolocalisation': '/geo/tableau-de-bord',
   'Logistique': '/logistique/entretien',
   'QHSE': '/qhse/checklist',
-  'Administration': '/admin/utilisateurs',
+  'DAF': '/daf/budget',
 }
 
 const breadcrumbs = computed(() => {
@@ -43,11 +45,13 @@ const breadcrumbs = computed(() => {
   }))
 })
 
+const isDaf = computed(() => authStore.user?.role === 'DAF')
+
 const navGroups = computed(() => [
   {
     id: 'main',
     items: [
-      { name: 'Tableau de bord', to: '/', icon: LayoutDashboard, show: true },
+      { name: 'Tableau de bord', to: '/dashboard', icon: LayoutDashboard, show: true },
       { name: 'Recherche Agent', to: '/recherche', icon: Search, show: true },
     ]
   },
@@ -56,56 +60,76 @@ const navGroups = computed(() => [
     label: 'Collecte',
     icon: Truck,
     show: authStore.hasRole(['COLLECTE']),
-    items: [
-      { name: 'Saisie Tonnage', to: '/collecte/tonnage', icon: ClipboardList },
-      { name: 'Bouclage Circuit', to: '/collecte/bouclage', icon: Route },
-      { name: 'Historique', to: '/collecte/historique', icon: History },
-    ]
+    items: isDaf.value
+      ? [
+          { name: 'Historique Saisies', to: '/collecte/historique', icon: History },
+        ]
+      : [
+          { name: 'Saisie Tonnage', to: '/collecte/tonnage', icon: ClipboardList },
+          { name: 'Bouclage Circuit', to: '/collecte/bouclage', icon: Route },
+          { name: 'Historique', to: '/collecte/historique', icon: History },
+        ]
   },
   {
     id: 'geo',
     label: 'Géolocalisation',
     icon: MapPin,
     show: authStore.hasRole(['GEO']),
-    items: [
-      { name: 'Validations GPS', to: '/geo/validation', icon: CheckCircle },
-      { name: 'Historique', to: '/geo/historique', icon: History },
-    ]
+    items: isDaf.value
+      ? [
+          { name: 'Tableau de Bord GEO', to: '/geo/tableau-de-bord', icon: MapPin },
+          { name: 'Historique GPS', to: '/geo/historique', icon: History },
+        ]
+      : [
+          { name: 'Tableau de Bord GEO', to: '/geo/tableau-de-bord', icon: MapPin },
+          { name: 'File de Validation', to: '/geo/validation', icon: CheckCircle },
+          { name: 'Historique', to: '/geo/historique', icon: History },
+        ]
   },
   {
     id: 'logistique',
     label: 'Logistique',
     icon: Wrench,
     show: authStore.hasRole(['LOGISTIQUE']),
-    items: [
-      { name: 'Entretien Véhicule', to: '/logistique/entretien', icon: ClipboardList },
-      { name: 'Suivi Matériel', to: '/logistique/materiel', icon: Wrench },
-      { name: 'Historique', to: '/logistique/historique', icon: History },
-    ]
+    items: isDaf.value
+      ? [
+          { name: 'Historique Entretiens', to: '/logistique/historique', icon: History },
+          { name: 'Suivi Matériel', to: '/logistique/materiel', icon: Wrench },
+        ]
+      : [
+          { name: 'Entretien Véhicule', to: '/logistique/entretien', icon: ClipboardList },
+          { name: 'Suivi Matériel', to: '/logistique/materiel', icon: Wrench },
+          { name: 'Historique', to: '/logistique/historique', icon: History },
+        ]
   },
   {
     id: 'qhse',
     label: 'QHSE / TRI',
     icon: ShieldCheck,
     show: authStore.hasRole(['QHSE']),
-    items: [
-      { name: 'Check-list Terrain', to: '/qhse/checklist', icon: ClipboardList },
-      { name: 'Test Alcoolémie', to: '/qhse/alcoolemie', icon: Wine },
-      { name: 'Tonnage TRI', to: '/qhse/tri', icon: Recycle },
-      { name: 'Historique', to: '/qhse/historique', icon: History },
-    ]
+    items: isDaf.value
+      ? [
+          { name: 'Historique QHSE', to: '/qhse/historique', icon: History },
+        ]
+      : [
+          { name: 'Check-list Terrain', to: '/qhse/checklist', icon: ClipboardList },
+          { name: 'Test Alcoolémie', to: '/qhse/alcoolemie', icon: Wine },
+          { name: 'Tonnage TRI', to: '/qhse/tri', icon: Recycle },
+          { name: 'Historique', to: '/qhse/historique', icon: History },
+        ]
   },
   {
-    id: 'admin',
-    label: 'Administration',
-    icon: Settings,
-    show: authStore.hasRole(['ADMIN']),
+    id: 'daf',
+    label: 'DAF',
+    icon: Landmark,
+    show: authStore.hasRole(['DAF']),
     items: [
-      { name: 'Utilisateurs', to: '/admin/utilisateurs', icon: Users },
-      { name: 'Paramètres', to: '/admin/parametres', icon: SlidersHorizontal },
-      { name: 'Consolidation', to: '/admin/consolidation', icon: FileCheck },
-      { name: 'Validation Primes', to: '/admin/validation', icon: CheckCircle },
-      { name: 'Rapports & Export', to: '/admin/rapports', icon: FileSpreadsheet },
+      { name: 'Vue Budgétaire', to: '/daf/budget', icon: Landmark },
+      { name: 'Utilisateurs', to: '/daf/utilisateurs', icon: Users },
+      { name: 'Paramètres', to: '/daf/parametres', icon: SlidersHorizontal },
+      { name: 'Consolidation', to: '/daf/consolidation', icon: FileCheck },
+      { name: 'Validation Primes', to: '/daf/validation', icon: CheckCircle },
+      { name: 'Rapports & Export', to: '/daf/rapports', icon: FileSpreadsheet },
     ]
   }
 ].filter(g => g.items?.some(i => i.show !== false) && (g.show === undefined || g.show)))
@@ -136,7 +160,7 @@ const currentMonth = new Date().toLocaleDateString('fr-FR', { month: 'long', yea
       <div class="h-16 flex items-center justify-between px-4 border-b border-white/10">
         <div class="flex items-center gap-3">
           <div class="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden bg-white">
-            <img src="/logo-clean-africa.jpg" alt="Clean Africa" class="w-full h-full object-contain" />
+            <img src="/logo-clean-africa.jpg" alt="Logo Clean Africa" class="w-full h-full object-contain" />
           </div>
           <div v-if="sidebarOpen || sidebarMobileOpen" class="overflow-hidden">
             <h1 class="text-white font-bold text-sm tracking-wide leading-tight">CLEAN AFRICA</h1>
@@ -242,7 +266,7 @@ const currentMonth = new Date().toLocaleDateString('fr-FR', { month: 'long', yea
     <!-- Main Content -->
     <main class="flex-1 flex flex-col overflow-hidden">
       <!-- Topbar -->
-      <header class="h-14 bg-white border-b border-border flex items-center justify-between px-4 sm:px-6 shadow-sm z-10">
+      <header class="h-14 bg-white dark:bg-[#1a1f2e] border-b border-border dark:border-[#2d3748] flex items-center justify-between px-4 sm:px-6 shadow-sm z-10">
         <div class="flex items-center gap-3">
           <!-- Mobile hamburger -->
           <button
@@ -281,6 +305,16 @@ const currentMonth = new Date().toLocaleDateString('fr-FR', { month: 'long', yea
         </div>
         <div class="flex items-center gap-4">
           <span class="hidden sm:inline text-sm text-gray-500 font-medium capitalize">{{ currentMonth }}</span>
+          <div class="h-6 w-px bg-gray-200 hidden sm:block"></div>
+          <!-- Dark mode toggle -->
+          <button
+            @click="themeStore.toggle()"
+            class="w-9 h-9 rounded-xl flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 dark:hover:text-gray-300 cursor-pointer transition-colors"
+            :aria-label="themeStore.isDark ? 'Passer en mode clair' : 'Passer en mode sombre'"
+          >
+            <Moon v-if="!themeStore.isDark" class="w-4.5 h-4.5" />
+            <Sun v-else class="w-4.5 h-4.5" />
+          </button>
           <div class="h-6 w-px bg-gray-200 hidden sm:block"></div>
           <div class="flex items-center gap-2">
             <div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>

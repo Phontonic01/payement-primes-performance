@@ -17,8 +17,10 @@ defineProps({
 
 <template>
   <div
-    class="animate-pulse bg-gray-200"
-    :class="rounded ? 'rounded-full' : 'rounded'"
+    class="animate-pulse bg-gray-200 dark:bg-gray-700"
+    :class="rounded ? 'rounded-full' : 'rounded-lg'"
     :style="{ width, height }"
+    role="status"
+    aria-label="Chargement..."
   ></div>
 </template>

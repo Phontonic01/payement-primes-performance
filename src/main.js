@@ -4,12 +4,18 @@ import './style.css'
 import App from './App.vue'
 import router from './router'
 
+import { piniaPersistPlugin } from './plugins/piniaPersist'
+
+const pinia = createPinia()
+pinia.use(piniaPersistPlugin)
 const app = createApp(App)
 
-app.use(createPinia())
+app.use(pinia)
 app.use(router)
 
 app.mount('#app')
+
+// Stores initialisés vides — les chefs de service saisissent leurs données
 
 // Mount Agentation (React component) in a separate container
 if (import.meta.env.DEV) {

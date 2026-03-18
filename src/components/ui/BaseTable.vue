@@ -6,18 +6,19 @@ defineProps({
 </script>
 
 <template>
-  <div class="overflow-x-auto">
+  <div class="overflow-x-auto" role="region" aria-label="Tableau de données" tabindex="0">
     <table class="w-full">
       <thead>
         <tr class="border-b border-gray-100">
           <th
             v-for="col in columns"
             :key="col.key"
+            scope="col"
             class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-4 py-3"
           >
             {{ col.label }}
           </th>
-          <th class="text-right px-4 py-3">
+          <th scope="col" class="text-right px-4 py-3">
             <span class="sr-only">Actions</span>
           </th>
         </tr>
@@ -31,20 +32,20 @@ defineProps({
           <td
             v-for="col in columns"
             :key="col.key"
-            class="px-4 py-3 text-sm text-gray-700"
+            class="px-4 py-3.5 text-sm text-gray-700"
           >
             <slot :name="'cell-' + col.key" :value="row[col.key]" :row="row">
               {{ row[col.key] }}
             </slot>
           </td>
-          <td class="px-4 py-3 text-right">
+          <td class="px-4 py-3.5 text-right">
             <slot name="actions" :row="row"></slot>
           </td>
         </tr>
       </tbody>
     </table>
-    <div v-if="rows.length === 0" class="text-center py-8 text-gray-400 text-sm">
-      Aucune donnee disponible
+    <div v-if="rows.length === 0" class="text-center py-12 text-gray-400 text-sm">
+      Aucune donnée disponible
     </div>
   </div>
 </template>

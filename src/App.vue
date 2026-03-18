@@ -11,14 +11,15 @@ const route = useRoute()
 const layout = computed(() => {
   if (route.meta.layout === 'DashboardLayout') return DashboardLayout
   if (route.meta.layout === 'AuthLayout') return AuthLayout
-  return 'div' // Fallback
+  return null // Landing page: no wrapper layout
 })
 </script>
 
 <template>
-  <component :is="layout">
+  <component v-if="layout" :is="layout">
     <router-view />
   </component>
+  <router-view v-else />
   <ToastContainer />
   <ConfirmModal />
 </template>

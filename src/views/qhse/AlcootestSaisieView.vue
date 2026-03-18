@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { Wine, CheckCircle, XCircle, Save } from 'lucide-vue-next'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
@@ -7,8 +7,19 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import AgentSearchInput from '@/components/ui/AgentSearchInput.vue'
 import { useToastStore } from '@/stores/toast'
+import { useSaisiesStore } from '@/stores/saisies'
+import { useAuthStore } from '@/stores/auth'
+import ReadOnlyBanner from '@/components/ui/ReadOnlyBanner.vue'
 
 const toastStore = useToastStore()
+const saisiesStore = useSaisiesStore()
+const authStore = useAuthStore()
+const readOnly = computed(() => authStore.isReadOnly())
+const selectedAgent = ref(null)
+
+function onAgentSelected(agentObj) {
+  selectedAgent.value = agentObj
+}
 
 const form = ref({
   date: new Date().toISOString().split('T')[0],
@@ -20,18 +31,32 @@ const form = ref({
 })
 
 function submitForm() {
-  if (!form.value.agent) {
+  if (!selectedAgent.value) {
     toastStore.addToast('Veuillez sélectionner un agent.', 'warning')
     return
   }
 
-  if (form.value.resultat === 'POSITIF') {
-    toastStore.addToast(`ATTENTION: Alcootest positif enregistré (${form.value.taux} g/l). Pénalité de 5 points appliquée. Note administrative potentielle.`, 'warning', 6000)
+  const isPositif = form.value.resultat === 'POSITIF'
+
+  // Enregistrer ou mettre à jour la QHSE pour cet agent/date
+  const existingQhse = saisiesStore.getQhse(selectedAgent.value.matricule, form.value.date)
+  saisiesStore.enregistrerQhse({
+    matricule: selectedAgent.value.matricule,
+    date: form.value.date,
+    agent: selectedAgent.value.nom,
+    checklistSur5: existingQhse?.checklistSur5 ?? 5,
+    alcootestPositif: isPositif,
+    epiConforme: existingQhse?.epiConforme ?? true,
+    quartHeureSecurite: existingQhse?.quartHeureSecurite ?? true,
+  })
+
+  if (isPositif) {
+    toastStore.addToast(`ATTENTION: Alcootest positif pour ${selectedAgent.value.nom} (${form.value.taux} g/l). Score QHSE = 0%.`, 'warning', 6000)
   } else {
-    toastStore.addToast('Alcootest négatif enregistré avec succès.', 'success')
+    toastStore.addToast(`Alcootest négatif enregistré pour ${selectedAgent.value.nom}.`, 'success')
   }
 
-  // Reset
+  selectedAgent.value = null
   form.value.agent = ''
   form.value.resultat = 'NEGATIF'
   form.value.taux = 0
@@ -52,7 +77,9 @@ function submitForm() {
       </div>
     </div>
 
-    <BaseCard>
+    <ReadOnlyBanner service="QHSE" />
+
+    <BaseCard :class="{ 'opacity-60 pointer-events-none': readOnly }">
       <form @submit.prevent="submitForm" class="space-y-6">
         <!-- Date & Time -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -64,9 +91,10 @@ function submitForm() {
         <AgentSearchInput
           v-model="form.agent"
           :date="form.date"
-          :filter-presents="true"
+          :filter-presents="false"
           label="Agent contrôlé"
           required
+          @agent-selected="onAgentSelected"
         />
 
         <!-- Test Result -->

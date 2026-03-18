@@ -40,7 +40,7 @@ const styleMap = {
 </script>
 
 <template>
-  <div class="fixed top-4 right-4 z-[9999] flex flex-col gap-3 pointer-events-none">
+  <div class="fixed top-4 right-4 z-[9999] flex flex-col gap-3 pointer-events-none" role="status" aria-live="polite">
     <TransitionGroup
       enter-active-class="transition-all duration-300 ease-out"
       enter-from-class="translate-x-full opacity-0"

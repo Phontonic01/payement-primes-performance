@@ -1,23 +1,44 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { LogIn, ChevronDown } from 'lucide-vue-next'
+import { LogIn, ArrowLeft } from 'lucide-vue-next'
 
 const authStore = useAuthStore()
+const route = useRoute()
+const router = useRouter()
 
 const username = ref('')
 const password = ref('')
 const role = ref('COLLECTE')
 const loading = ref(false)
 
-const roles = [
-  { value: 'ADMIN', label: 'Administrateur', desc: 'Accès complet' },
-  { value: 'COLLECTE', label: 'Service Collecte', desc: 'Tonnage & bouclage' },
-  { value: 'GEO', label: 'Service Géolocalisation', desc: 'Validation GPS' },
-  { value: 'LOGISTIQUE', label: 'Service Logistique', desc: 'Entretien véhicules' },
-  { value: 'QHSE', label: 'Service QHSE', desc: 'Sécurité & TRI' },
-  { value: 'LECTURE', label: 'Consultation', desc: 'Lecture seule' }
-]
+// Mapping service → label pour affichage
+const serviceLabels = {
+  DAF: 'DAF — Direction Administrative et Financière',
+  COLLECTE: 'Service Collecte',
+  GEO: 'Service Géolocalisation',
+  LOGISTIQUE: 'Service Logistique',
+  QHSE: 'Service QHSE / TRI',
+  LECTURE: 'Consultation',
+}
+
+// Mapping service → route de destination après login
+const serviceRedirects = {
+  DAF: '/daf/budget',
+  COLLECTE: '/collecte/tonnage',
+  GEO: '/geo/tableau-de-bord',
+  LOGISTIQUE: '/logistique/entretien',
+  QHSE: '/qhse/checklist',
+  LECTURE: '/',
+}
+
+// Pré-sélectionner le service depuis le query param
+onMounted(() => {
+  if (route.query.service && serviceLabels[route.query.service]) {
+    role.value = route.query.service
+  }
+})
 
 async function handleLogin() {
   if (username.value && role.value) {
@@ -25,15 +46,41 @@ async function handleLogin() {
     await new Promise(r => setTimeout(r, 400))
     authStore.login(username.value, role.value)
     loading.value = false
+    // Rediriger vers la page du service concerné
+    const redirect = serviceRedirects[role.value] || '/'
+    router.push(redirect)
   }
 }
 </script>
 
 <template>
   <div>
+    <!-- Bouton retour vers sélection services -->
+    <button
+      @click="router.push({ name: 'landing' })"
+      class="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-emerald-600 mb-5 transition-colors cursor-pointer"
+    >
+      <ArrowLeft class="w-4 h-4" />
+      Changer de service
+    </button>
+
+    <!-- Service badge -->
     <div class="mb-6">
+      <div
+        class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider mb-3"
+        :class="{
+          'bg-emerald-50 text-emerald-700': role === 'COLLECTE',
+          'bg-blue-50 text-blue-700': role === 'GEO',
+          'bg-amber-50 text-amber-700': role === 'LOGISTIQUE',
+          'bg-purple-50 text-purple-700': role === 'QHSE',
+          'bg-rose-50 text-rose-700': role === 'DAF',
+          'bg-gray-50 text-gray-700': role === 'LECTURE',
+        }"
+      >
+        {{ serviceLabels[role] || role }}
+      </div>
       <h2 class="text-2xl font-bold text-gray-900">Connexion</h2>
-      <p class="mt-1 text-sm text-gray-500">Accédez à votre espace de travail</p>
+      <p class="mt-1 text-sm text-gray-500">Identifiez-vous pour accéder à votre espace</p>
     </div>
 
     <form class="space-y-5" @submit.prevent="handleLogin">
@@ -62,27 +109,18 @@ async function handleLogin() {
         />
       </div>
 
-      <div>
-        <label for="role" class="block text-sm font-medium text-gray-700 mb-1.5">
-          Service
-          <span class="text-gray-400 font-normal">(simulation)</span>
-        </label>
-        <div class="relative">
-          <select
-            id="role"
-            v-model="role"
-            class="block w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm appearance-none focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none pr-10 cursor-pointer"
-          >
-            <option v-for="r in roles" :key="r.value" :value="r.value">{{ r.label }} — {{ r.desc }}</option>
-          </select>
-          <ChevronDown class="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-        </div>
-      </div>
-
       <button
         type="submit"
         :disabled="loading || !username"
-        class="w-full flex items-center justify-center gap-2 py-3 px-4 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold rounded-xl text-sm shadow-lg shadow-emerald-600/25 hover:shadow-emerald-700/30 cursor-pointer transition-all duration-200"
+        class="w-full flex items-center justify-center gap-2 py-3 px-4 text-white font-semibold rounded-xl text-sm shadow-lg cursor-pointer transition-all duration-200 disabled:bg-gray-300 disabled:cursor-not-allowed disabled:shadow-none"
+        :class="{
+          'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/25 hover:shadow-emerald-700/30': role === 'COLLECTE',
+          'bg-blue-600 hover:bg-blue-700 shadow-blue-600/25 hover:shadow-blue-700/30': role === 'GEO',
+          'bg-amber-600 hover:bg-amber-700 shadow-amber-600/25 hover:shadow-amber-700/30': role === 'LOGISTIQUE',
+          'bg-purple-600 hover:bg-purple-700 shadow-purple-600/25 hover:shadow-purple-700/30': role === 'QHSE',
+          'bg-rose-600 hover:bg-rose-700 shadow-rose-600/25 hover:shadow-rose-700/30': role === 'DAF',
+          'bg-gray-600 hover:bg-gray-700 shadow-gray-600/25 hover:shadow-gray-700/30': role === 'LECTURE',
+        }"
       >
         <svg v-if="loading" class="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
           <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25" />

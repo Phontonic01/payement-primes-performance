@@ -45,7 +45,7 @@ onUnmounted(() => {
         ></div>
 
         <!-- Modal -->
-        <div class="relative bg-white rounded-xl shadow-xl border border-gray-100 w-full max-w-md overflow-hidden">
+        <div class="relative bg-white rounded-xl shadow-xl border border-gray-100 w-full max-w-md overflow-hidden" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title">
           <div class="p-6">
             <!-- Icon -->
             <div
@@ -59,7 +59,7 @@ onUnmounted(() => {
             </div>
 
             <!-- Content -->
-            <h3 class="text-lg font-semibold text-gray-900 text-center mb-2">
+            <h3 id="confirm-modal-title" class="text-lg font-semibold text-gray-900 text-center mb-2">
               {{ confirmStore.title }}
             </h3>
             <p class="text-sm text-gray-500 text-center leading-relaxed">

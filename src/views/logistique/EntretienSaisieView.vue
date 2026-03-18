@@ -6,8 +6,21 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import AgentSearchInput from '@/components/ui/AgentSearchInput.vue'
 import { ClipboardCheck, Gauge } from 'lucide-vue-next'
 import { useToastStore } from '@/stores/toast'
+import { useSaisiesStore } from '@/stores/saisies'
+import { useAuthStore } from '@/stores/auth'
+import { useVehiculesStore } from '@/stores/vehicules'
+import ReadOnlyBanner from '@/components/ui/ReadOnlyBanner.vue'
 
 const toastStore = useToastStore()
+const saisiesStore = useSaisiesStore()
+const authStore = useAuthStore()
+const vehiculesStore = useVehiculesStore()
+const readOnly = computed(() => authStore.isReadOnly())
+const selectedAgent = ref(null)
+
+function onAgentSelected(agentObj) {
+  selectedAgent.value = agentObj
+}
 
 const form = ref({
   date: new Date().toISOString().split('T')[0],
@@ -25,12 +38,23 @@ const scoreEntretien = computed(() => {
 })
 
 function submitForm() {
-  if (!form.value.agent || !form.value.vehicule) {
+  if (!selectedAgent.value || !form.value.vehicule) {
     toastStore.addToast('Veuillez remplir tous les champs obligatoires.', 'warning')
     return
   }
-  toastStore.addToast(`Fiche d'entretien enregistrée. Score moyen: ${scoreEntretien.value}/10`, 'success')
-  // Reset
+  saisiesStore.enregistrerEntretien({
+    matricule: selectedAgent.value.matricule,
+    date: form.value.date,
+    agent: selectedAgent.value.nom,
+    vehicule: form.value.vehicule,
+    etatMecanique: form.value.etatMecanique,
+    proprete: form.value.proprete,
+    respectControles: form.value.etatPneus,
+    degradations: form.value.observations,
+    note: scoreEntretien.value,
+  })
+  toastStore.addToast(`Fiche d'entretien enregistrée pour ${selectedAgent.value.nom}. Score: ${scoreEntretien.value.toFixed(1)}/10`, 'success')
+  selectedAgent.value = null
   form.value = {
     date: new Date().toISOString().split('T')[0],
     agent: '',
@@ -52,8 +76,10 @@ function submitForm() {
       <p class="text-sm text-gray-500 mt-1">Service Logistique — Evaluation de l'etat du materiel</p>
     </div>
 
+    <ReadOnlyBanner service="Logistique" />
+
     <!-- Form Card -->
-    <div class="bg-white rounded-xl border border-gray-100">
+    <div class="bg-white rounded-xl border border-gray-100" :class="{ 'opacity-60 pointer-events-none': readOnly }">
       <form @submit.prevent="submitForm" class="divide-y divide-gray-100">
 
         <!-- Identity Fields -->
@@ -65,22 +91,30 @@ function submitForm() {
               <AgentSearchInput
                 v-model="form.agent"
                 :date="form.date"
-                :filter-presents="true"
+                :filter-presents="false"
                 label="Chauffeur évalué"
                 required
+                @agent-selected="onAgentSelected"
               />
             </div>
 
             <div class="space-y-1.5">
-              <label class="block text-sm font-medium text-gray-900">Vehicule (Immatriculation) <span class="text-red-500">*</span></label>
+              <label class="block text-sm font-medium text-gray-900">Véhicule du parc <span class="text-red-500">*</span></label>
               <select
                 v-model="form.vehicule"
                 required
                 class="block w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-gray-900 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-colors"
               >
-                <option value="">Selectionner un vehicule</option>
-                <option value="GA-123-AB">Camion GA-123-AB</option>
-                <option value="GA-456-CD">Camion GA-456-CD</option>
+                <option value="">— Sélectionner un véhicule —</option>
+                <optgroup v-for="type in vehiculesStore.typesPL" :key="type" :label="type">
+                  <option
+                    v-for="v in vehiculesStore.vehiculesOperationnels.filter(vv => vv.type === type)"
+                    :key="v.noParc"
+                    :value="`${v.type} N°${v.noParc} (${v.immatriculation || 'Sans immat'})`"
+                  >
+                    N°{{ v.noParc }} — {{ v.immatriculation || 'Sans immat' }} ({{ v.marque }})
+                  </option>
+                </optgroup>
               </select>
             </div>
           </div>

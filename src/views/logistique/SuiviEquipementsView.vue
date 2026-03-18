@@ -7,23 +7,21 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import AgentSearchInput from '@/components/ui/AgentSearchInput.vue'
 import { Truck, AlertTriangle, XCircle, ClipboardCheck, Save, CheckCircle, X } from 'lucide-vue-next'
 import { useToastStore } from '@/stores/toast'
+import { useVehiculesStore } from '@/stores/vehicules'
 
 const toastStore = useToastStore()
+const vehiculesStore = useVehiculesStore()
 
-// ── Flotte véhicules ──
+// ── Flotte véhicules (depuis le store) ──
 const flotteColumns = [
-  { key: 'immatriculation', label: 'Immatriculation' },
+  { key: 'noParc', label: 'N° Parc' },
   { key: 'type', label: 'Type' },
-  { key: 'dernierEntretien', label: 'Dernier Entretien' },
-  { key: 'scoreMoyen', label: 'Score Moyen' },
-  { key: 'statut', label: 'Statut' },
+  { key: 'marque', label: 'Marque' },
+  { key: 'immatriculation', label: 'Immatriculation' },
+  { key: 'etat', label: 'État' },
 ]
 
-const flotte = [
-  { id: 1, immatriculation: 'GA-123-AB', type: 'Camion Tasseur (CT)', dernierEntretien: '2025-12-10', scoreMoyen: 8.5, statut: 'OPERATIONNEL' },
-  { id: 2, immatriculation: 'GA-456-CD', type: 'Camion Tasseur (CT)', dernierEntretien: '2025-12-09', scoreMoyen: 5.0, statut: 'A_REVISER' },
-  { id: 3, immatriculation: 'GA-789-EF', type: 'Camion Ampliroll (CA)', dernierEntretien: '2025-12-01', scoreMoyen: 3.2, statut: 'EN_PANNE' },
-]
+const flotte = computed(() => vehiculesStore.vehiculesPL)
 
 // ── Petits équipements - Restitution ──
 const equipements = [
@@ -78,7 +76,16 @@ function submitRestitution() {
     return
   }
   const s = scoreRestitution.value
-  toastStore.addToast(`Restitution enregistrée. ${s.restitues}/${s.total} équipements restitués (${s.pct}%). ${s.bonEtat} en bon état.`, 'success')
+  // Persister dans l'historique local
+  historiqueRestitutions.value.unshift({
+    id: historiqueRestitutions.value.length + 1,
+    date: restitutionForm.value.date,
+    agent: restitutionForm.value.agent,
+    equipements: `${s.total} sortis`,
+    restitues: `${s.restitues}/${s.total}`,
+    etat: s.restitues === s.total ? 'COMPLET' : 'INCOMPLET',
+  })
+  toastStore.addToast(`Restitution enregistrée. ${s.restitues}/${s.total} équipements (${s.pct}%).`, 'success')
   resetRestitution()
 }
 
@@ -91,13 +98,7 @@ const restitutionColumns = [
   { key: 'etat', label: 'État' },
 ]
 
-const historiqueRestitutions = [
-  { id: 1, date: '2025-12-10', agent: 'Medza Ondo Scheila', equipements: '4 sortis', restitues: '4/4', etat: 'COMPLET' },
-  { id: 2, date: '2025-12-10', agent: 'Tengou Joram', equipements: '5 sortis', restitues: '5/5', etat: 'COMPLET' },
-  { id: 3, date: '2025-12-09', agent: 'Mamfoumbi Muriella', equipements: '3 sortis', restitues: '2/3', etat: 'INCOMPLET' },
-  { id: 4, date: '2025-12-09', agent: 'Mbatsi Davy', equipements: '4 sortis', restitues: '4/4', etat: 'COMPLET' },
-  { id: 5, date: '2025-12-08', agent: 'Tsamba Tchewarny', equipements: '3 sortis', restitues: '1/3', etat: 'INCOMPLET' },
-]
+const historiqueRestitutions = ref([])
 </script>
 
 <template>
@@ -114,7 +115,7 @@ const historiqueRestitutions = [
         <div class="flex items-start justify-between">
           <div>
             <p class="text-sm font-medium text-gray-500">Véhicules Opérationnels</p>
-            <p class="text-3xl font-bold text-gray-900 mt-2">18 <span class="text-sm font-normal text-gray-500">/ 22</span></p>
+            <p class="text-3xl font-bold text-gray-900 mt-2">{{ vehiculesStore.vehiculesOperationnels.length }} <span class="text-sm font-normal text-gray-500">/ {{ vehiculesStore.vehiculesPL.length }}</span></p>
           </div>
           <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-emerald-50">
             <Truck class="w-5 h-5 text-emerald-600" />
@@ -126,8 +127,8 @@ const historiqueRestitutions = [
       <div class="bg-white rounded-xl border border-gray-100 p-5 hover:shadow-sm transition-shadow">
         <div class="flex items-start justify-between">
           <div>
-            <p class="text-sm font-medium text-gray-500">À Réviser</p>
-            <p class="text-3xl font-bold text-gray-900 mt-2">3</p>
+            <p class="text-sm font-medium text-gray-500">En Panne / Standby</p>
+            <p class="text-3xl font-bold text-gray-900 mt-2">{{ vehiculesStore.vehiculesPL.filter(v => ['Panne', 'Standby'].includes(v.etat)).length }}</p>
           </div>
           <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-amber-50">
             <AlertTriangle class="w-5 h-5 text-amber-500" />
@@ -139,8 +140,8 @@ const historiqueRestitutions = [
       <div class="bg-white rounded-xl border border-gray-100 p-5 hover:shadow-sm transition-shadow">
         <div class="flex items-start justify-between">
           <div>
-            <p class="text-sm font-medium text-gray-500">En Panne (Immobilisés)</p>
-            <p class="text-3xl font-bold text-gray-900 mt-2">1</p>
+            <p class="text-sm font-medium text-gray-500">HS / Accidentés</p>
+            <p class="text-3xl font-bold text-gray-900 mt-2">{{ vehiculesStore.vehiculesPL.filter(v => ['HS', 'Accidenté'].includes(v.etat)).length }}</p>
           </div>
           <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-red-50">
             <XCircle class="w-5 h-5 text-red-500" />
@@ -156,15 +157,16 @@ const historiqueRestitutions = [
         <h2 class="text-base font-semibold text-gray-900">Détail de la flotte</h2>
       </div>
       <BaseTable :columns="flotteColumns" :rows="flotte">
-        <template #cell-scoreMoyen="{ value }">
-          <span class="font-bold text-sm" :class="value >= 7 ? 'text-emerald-600' : (value >= 5 ? 'text-amber-500' : 'text-red-500')">
-            {{ value.toFixed(1) }}
-          </span>
+        <template #cell-immatriculation="{ value }">
+          <span class="text-sm font-mono text-gray-700">{{ value || '—' }}</span>
         </template>
-        <template #cell-statut="{ value }">
-          <BaseBadge v-if="value === 'OPERATIONNEL'" status="success" text="Opérationnel" />
-          <BaseBadge v-else-if="value === 'A_REVISER'" status="warning" text="À réviser" />
-          <BaseBadge v-else-if="value === 'EN_PANNE'" status="danger" text="En panne" />
+        <template #cell-etat="{ value }">
+          <BaseBadge v-if="value === 'Opérationnel'" status="success" text="Opérationnel" />
+          <BaseBadge v-else-if="value === 'Panne'" status="danger" text="Panne" />
+          <BaseBadge v-else-if="value === 'Standby'" status="warning" text="Standby" />
+          <BaseBadge v-else-if="value === 'HS'" status="danger" text="Hors Service" />
+          <BaseBadge v-else-if="value === 'Accidenté'" status="danger" text="Accidenté" />
+          <BaseBadge v-else status="neutral" :text="value" />
         </template>
       </BaseTable>
     </div>

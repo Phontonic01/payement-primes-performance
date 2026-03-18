@@ -18,8 +18,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     localStorage.setItem('user', JSON.stringify(mockUser))
     localStorage.setItem('token', 'mock-jwt-token-123')
-
-    router.push('/')
+    // La redirection est gérée par le composant appelant (LoginView)
   }
 
   function logout() {
@@ -29,14 +28,20 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('user')
     localStorage.removeItem('token')
 
-    router.push('/login')
+    router.push('/')
   }
 
   function hasRole(allowedRoles) {
     if (!user.value) return false
-    if (user.value.role === 'ADMIN') return true
+    if (user.value.role === 'DAF') return true // DAF a accès à tout (vue globale, lecture seule)
     return allowedRoles.includes(user.value.role)
   }
 
-  return { user, isAuthenticated, login, logout, hasRole }
+  // DAF = lecture seule sur les modules des autres services
+  function isReadOnly() {
+    if (!user.value) return true
+    return user.value.role === 'DAF'
+  }
+
+  return { user, isAuthenticated, login, logout, hasRole, isReadOnly }
 })

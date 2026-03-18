@@ -6,8 +6,19 @@ import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import AgentSearchInput from '@/components/ui/AgentSearchInput.vue'
 import { useToastStore } from '@/stores/toast'
+import { useSaisiesStore } from '@/stores/saisies'
+import { useAuthStore } from '@/stores/auth'
+import ReadOnlyBanner from '@/components/ui/ReadOnlyBanner.vue'
 
 const toastStore = useToastStore()
+const saisiesStore = useSaisiesStore()
+const authStore = useAuthStore()
+const readOnly = computed(() => authStore.isReadOnly())
+const selectedAgent = ref(null)
+
+function onAgentSelected(agentObj) {
+  selectedAgent.value = agentObj
+}
 
 const form = ref({
   date: new Date().toISOString().split('T')[0],
@@ -63,12 +74,22 @@ const scoreBg = computed(() => {
 })
 
 function submitForm() {
-  if (!form.value.agent) {
+  if (!selectedAgent.value) {
     toastStore.addToast('Veuillez sélectionner un agent.', 'warning')
     return
   }
-  toastStore.addToast(`Checklist enregistrée. Score santé sécurité: ${scoreQhse.value.toFixed(2)}/5`, 'success')
-  // Reset simulation
+  const epiConforme = form.value.epiBottes && form.value.epiGilets && form.value.epiGants
+  saisiesStore.enregistrerQhse({
+    matricule: selectedAgent.value.matricule,
+    date: form.value.date,
+    agent: selectedAgent.value.nom,
+    checklistSur5: scoreQhse.value,
+    alcootestPositif: false,
+    epiConforme,
+    quartHeureSecurite: true,
+  })
+  toastStore.addToast(`Checklist enregistrée pour ${selectedAgent.value.nom}. Score: ${scoreQhse.value.toFixed(2)}/5`, 'success')
+  selectedAgent.value = null
   form.value.agent = ''
   form.value.observations = ''
 }
@@ -87,7 +108,9 @@ function submitForm() {
       </div>
     </div>
 
-    <BaseCard>
+    <ReadOnlyBanner service="QHSE" />
+
+    <BaseCard :class="{ 'opacity-60 pointer-events-none': readOnly }">
       <form @submit.prevent="submitForm" class="space-y-6">
         <!-- Date & Agent -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -97,9 +120,10 @@ function submitForm() {
             <AgentSearchInput
               v-model="form.agent"
               :date="form.date"
-              :filter-presents="true"
+              :filter-presents="false"
               label="Agent contrôlé"
               required
+              @agent-selected="onAgentSelected"
             />
           </div>
         </div>

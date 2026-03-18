@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { Search, Calendar, User, Hash, MapPin, Truck, ShieldCheck, Wrench, TrendingUp, CheckCircle, XCircle, Clock, AlertTriangle, ArrowDown, Download } from 'lucide-vue-next'
 import { generateFicheAgentPdf } from '@/utils/generatePdf'
+import { formatDateFr } from '@/utils/formatDate'
 import { useAgentsStore } from '@/stores/agents'
 import { usePrimesStore } from '@/stores/primes'
 import AgentSearchInput from '@/components/ui/AgentSearchInput.vue'
@@ -31,39 +32,54 @@ const joursPresents = computed(() => {
   ).length
 })
 
-// Données mock mensuelles par agent — sera remplacé par la BDD
-const evaluationsMock = {
-  '2823': { typeVehicule: 'BOM', typeAgent: 'CHAUFFEUR_COLLECTE', tonnage: 22, rotations: 2, bouclages: ['VALIDE', 'VALIDE', 'VALIDE'], noteEntretien: 9.5, qhse: { checklistSur5: 5, alcootestPositif: false, epiConforme: true, quartHeureSecurite: true } },
-  '2948': { typeVehicule: 'Plateaux', typeAgent: 'CHAUFFEUR_COLLECTE', tonnage: 7.5, rotations: 3, bouclages: ['VALIDE', 'PARTIEL', 'VALIDE'], noteEntretien: 6.0, qhse: { checklistSur5: 4, alcootestPositif: true, epiConforme: true, quartHeureSecurite: true } },
-  '0946': { typeVehicule: 'BOM', typeAgent: 'RIPEUR_COLLECTE', tonnage: 16, rotations: 2, bouclages: ['VALIDE', 'VALIDE'], noteEntretien: null, qhse: { checklistSur5: 3.5, alcootestPositif: false, epiConforme: true, quartHeureSecurite: false } },
-  '1495': { typeVehicule: 'Canter', typeAgent: 'CHAUFFEUR_COLLECTE', tonnage: 1.2, rotations: 3, bouclages: ['VALIDE', 'VALIDE', 'VALIDE'], noteEntretien: 7.0, qhse: { checklistSur5: 4, alcootestPositif: false, epiConforme: true, quartHeureSecurite: true } },
-  '3016': { typeVehicule: 'BOM', typeAgent: 'CHAUFFEUR_COLLECTE', tonnage: 14, rotations: 2, bouclages: ['VALIDE', 'VALIDE', 'VALIDE'], noteEntretien: 7.5, qhse: { checklistSur5: 5, alcootestPositif: false, epiConforme: true, quartHeureSecurite: true } },
-  '0943': { typeVehicule: 'Bennes', typeAgent: 'CHAUFFEUR_COLLECTE', tonnage: 15, rotations: 2, bouclages: ['VALIDE', 'VALIDE'], noteEntretien: 6.5, qhse: { checklistSur5: 4, alcootestPositif: false, epiConforme: false, quartHeureSecurite: true } },
-  '2024': { typeVehicule: 'Movi', typeAgent: 'RIPEUR_TRI', tonnage: 10, rotations: 3, bouclages: ['PARTIEL', 'PARTIEL'], noteEntretien: null, qhse: { checklistSur5: 3, alcootestPositif: false, epiConforme: true, quartHeureSecurite: false } },
-  '2768': { typeVehicule: 'BOM', typeAgent: 'CHAUFFEUR_COLLECTE', tonnage: 22, rotations: 2, bouclages: ['VALIDE', 'VALIDE', 'VALIDE'], noteEntretien: 10, qhse: { checklistSur5: 5, alcootestPositif: false, epiConforme: true, quartHeureSecurite: true }, joursPresents: 28 },
-}
+import { useSaisiesStore } from '@/stores/saisies'
+const saisiesStore = useSaisiesStore()
 
-// Calcul complet via le moteur de primes
+// Mois sélectionné
+const moisSelectionne = computed(() => {
+  if (!selectedDate.value) return ''
+  return selectedDate.value.substring(0, 7) // "YYYY-MM"
+})
+
+// Calcul complet via le moteur de primes + store saisies
 const fiche = computed(() => {
-  if (!selectedAgent.value) return null
-  const eval_ = evaluationsMock[selectedAgent.value.matricule]
-  if (!eval_) return null
+  if (!selectedAgent.value || !moisSelectionne.value) return null
+
+  const agregation = saisiesStore.getAgregationMensuelle(selectedAgent.value.matricule, moisSelectionne.value)
+
+  // Si aucune saisie n'existe, pas de fiche
+  if (agregation.nbSaisiesTonnage === 0 && agregation.nbSaisiesBouclage === 0 &&
+      agregation.nbSaisiesEntretien === 0 && agregation.nbSaisiesQhse === 0) {
+    return null
+  }
+
+  const typeAgent = selectedAgent.value.role === 'EQUIPIER' ? 'RIPEUR_COLLECTE' : 'CHAUFFEUR_COLLECTE'
 
   return primesStore.calculerFicheAgent({
-    typeVehicule: eval_.typeVehicule,
-    typeAgent: eval_.typeAgent,
-    joursPresents: eval_.joursPresents || joursPresents.value,
-    tonnageMoyen: eval_.tonnage,
-    rotationsMoyennes: eval_.rotations,
-    statutsBouclage: eval_.bouclages,
-    noteEntretienMoyenne: eval_.noteEntretien,
-    qhseData: eval_.qhse,
+    typeVehicule: agregation.typeVehicule,
+    typeAgent,
+    joursPresents: joursPresents.value || 28,
+    tonnageMoyen: agregation.tonnageMoyen,
+    rotationsMoyennes: agregation.rotationsMoyennes,
+    statutsBouclage: agregation.statutsBouclage,
+    noteEntretienMoyenne: agregation.noteEntretienMoyenne,
+    qhseData: agregation.qhseData,
   })
 })
 
 const evalData = computed(() => {
-  if (!selectedAgent.value) return null
-  return evaluationsMock[selectedAgent.value.matricule] || null
+  if (!selectedAgent.value || !moisSelectionne.value) return null
+  const agregation = saisiesStore.getAgregationMensuelle(selectedAgent.value.matricule, moisSelectionne.value)
+  if (agregation.nbSaisiesTonnage === 0) return null
+  return {
+    typeVehicule: agregation.typeVehicule,
+    typeAgent: selectedAgent.value.role === 'EQUIPIER' ? 'RIPEUR_COLLECTE' : 'CHAUFFEUR_COLLECTE',
+    tonnage: agregation.tonnageMoyen,
+    rotations: agregation.rotationsMoyennes,
+    bouclages: agregation.statutsBouclage,
+    noteEntretien: agregation.noteEntretienMoyenne,
+    qhse: agregation.qhseData,
+  }
 })
 
 function scoreColor(score) {
@@ -153,7 +169,7 @@ function scoreBarColor(score) {
 
           <div class="flex items-center gap-4">
             <div class="text-right">
-              <p class="text-xs text-gray-400 font-medium">{{ selectedDate }}</p>
+              <p class="text-xs text-gray-400 font-medium">{{ formatDateFr(selectedDate) }}</p>
               <div v-if="isPresent === true" class="flex items-center gap-1.5 mt-1">
                 <CheckCircle class="w-5 h-5 text-emerald-500" />
                 <span class="text-sm font-semibold text-emerald-600">Présent</span>
@@ -345,6 +361,18 @@ function scoreBarColor(score) {
         </div>
       </div>
     </template>
+
+    <!-- Agent sélectionné mais pas de saisies -->
+    <div v-else-if="selectedAgent && !fiche" class="bg-white rounded-xl border border-gray-100 p-12 text-center">
+      <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-amber-50 mb-4">
+        <AlertTriangle class="w-8 h-8 text-amber-400" />
+      </div>
+      <h3 class="text-lg font-semibold text-gray-900">Aucune saisie pour cet agent</h3>
+      <p class="text-sm text-gray-500 mt-1 max-w-md mx-auto">
+        Aucune donnée de performance n'a été saisie pour <strong>{{ selectedAgent.nom }}</strong> sur le mois sélectionné.
+        Les services doivent d'abord saisir le tonnage, bouclage, entretien et QHSE.
+      </p>
+    </div>
 
     <!-- État vide -->
     <div v-else class="bg-white rounded-xl border border-gray-100 p-12 text-center">

@@ -1,5 +1,7 @@
-@import "tailwindcss";
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
   --color-primary: #065F46;
@@ -23,6 +25,7 @@
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
 }
 
+/* ── Light mode (default) ── */
 body {
   background-color: var(--color-background);
   color: var(--color-text);
@@ -31,21 +34,109 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Scrollbar */
+/* ── Dark mode overrides ── */
+.dark body,
+.dark {
+  --color-background: #0f1419;
+  --color-surface: #1a1f2e;
+  --color-text: #e5e7eb;
+  --color-text-secondary: #9ca3af;
+  --color-border: #2d3748;
+}
+
+.dark body {
+  background-color: #0f1419;
+  color: #e5e7eb;
+}
+
+/* Dark mode: white cards → dark surface */
+.dark .bg-white {
+  background-color: #1a1f2e !important;
+}
+
+/* Dark mode: gray-50/100 backgrounds */
+.dark .bg-gray-50,
+.dark .bg-gray-100 {
+  background-color: #1e2433 !important;
+}
+.dark .bg-gray-50\/50 {
+  background-color: rgba(30, 36, 51, 0.5) !important;
+}
+
+/* Dark mode: borders */
+.dark .border-gray-100,
+.dark .border-gray-200 {
+  border-color: #2d3748 !important;
+}
+.dark .divide-gray-50 > :not([hidden]) ~ :not([hidden]),
+.dark .divide-gray-100 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #2d3748 !important;
+}
+
+/* Dark mode: text colors */
+.dark .text-gray-900 { color: #f3f4f6 !important; }
+.dark .text-gray-800 { color: #e5e7eb !important; }
+.dark .text-gray-700 { color: #d1d5db !important; }
+.dark .text-gray-600 { color: #9ca3af !important; }
+.dark .text-gray-500 { color: #9ca3af !important; }
+.dark .text-gray-400 { color: #6b7280 !important; }
+
+/* Dark mode: input fields */
+.dark input,
+.dark select,
+.dark textarea {
+  background-color: #1e2433 !important;
+  border-color: #374151 !important;
+  color: #e5e7eb !important;
+}
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #6b7280 !important;
+}
+.dark input:focus,
+.dark select:focus,
+.dark textarea:focus {
+  background-color: #242b3d !important;
+  border-color: #059669 !important;
+}
+
+/* Dark mode: hover states */
+.dark .hover\:bg-gray-50:hover,
+.dark .hover\:bg-gray-50\/50:hover {
+  background-color: rgba(30, 36, 51, 0.7) !important;
+}
+
+/* Dark mode: scrollbar */
+.dark ::-webkit-scrollbar-thumb { background: #4b5563; }
+.dark ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+
+/* Dark mode: badges keep their colors (emerald/amber/red/blue backgrounds are fine) */
+
+/* ── Scrollbar ── */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
 
-/* Focus rings */
+/* ── Focus rings ── */
 *:focus-visible {
   outline: 2px solid var(--color-primary-light);
   outline-offset: 2px;
 }
 
-/* Smooth transitions globally */
-*, *::before, *::after {
-  transition-property: color, background-color, border-color, box-shadow, opacity;
-  transition-duration: 150ms;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+/* ── Smooth transitions (respects reduced-motion) ── */
+@media (prefers-reduced-motion: no-preference) {
+  *, *::before, *::after {
+    transition-property: color, background-color, border-color, box-shadow, opacity;
+    transition-duration: 150ms;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

@@ -4,13 +4,19 @@ const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
+      path: '/',
+      name: 'landing',
+      component: () => import('@/views/LandingView.vue'),
+      meta: { requiresAuth: false }
+    },
+    {
       path: '/login',
       name: 'login',
       component: () => import('@/views/LoginView.vue'),
       meta: { requiresAuth: false, layout: 'AuthLayout' }
     },
     {
-      path: '/',
+      path: '/dashboard',
       name: 'dashboard',
       component: () => import('@/views/DashboardView.vue'),
       meta: { requiresAuth: true, layout: 'DashboardLayout', title: 'Tableau de bord', breadcrumb: ['Tableau de bord'] }
@@ -41,6 +47,12 @@ const router = createRouter({
       meta: { requiresAuth: true, layout: 'DashboardLayout', title: 'Historique Collecte', breadcrumb: ['Collecte', 'Historique Collecte'] }
     },
     // Géolocalisation
+    {
+      path: '/geo/tableau-de-bord',
+      name: 'geo-tableau-de-bord',
+      component: () => import('@/views/geo/GeoTableauBordView.vue'),
+      meta: { requiresAuth: true, layout: 'DashboardLayout', title: 'Tableau de Bord GEO', breadcrumb: ['Géolocalisation', 'Tableau de Bord'] }
+    },
     {
       path: '/geo/validation',
       name: 'geo-validation',
@@ -103,50 +115,60 @@ const router = createRouter({
       component: () => import('@/views/qhse/HistoriqueQhseView.vue'),
       meta: { requiresAuth: true, layout: 'DashboardLayout', title: 'Historique QHSE', breadcrumb: ['QHSE', 'Historique QHSE'] }
     },
-    // Admin
+    // DAF (Direction Administrative et Financière)
     {
-      path: '/admin/utilisateurs',
-      name: 'admin-utilisateurs',
-      component: () => import('@/views/admin/AdminUsersView.vue'),
-      meta: { requiresAuth: true, layout: 'DashboardLayout', title: 'Utilisateurs', breadcrumb: ['Administration', 'Utilisateurs'] }
+      path: '/daf/budget',
+      name: 'daf-budget',
+      component: () => import('@/views/daf/DafBudgetView.vue'),
+      meta: { requiresAuth: true, layout: 'DashboardLayout', title: 'Vue Budgétaire', breadcrumb: ['DAF', 'Vue Budgétaire'] }
     },
     {
-      path: '/admin/parametres',
-      name: 'admin-parametres',
-      component: () => import('@/views/admin/AdminParamsView.vue'),
-      meta: { requiresAuth: true, layout: 'DashboardLayout', title: 'Paramètres', breadcrumb: ['Administration', 'Paramètres'] }
+      path: '/daf/utilisateurs',
+      name: 'daf-utilisateurs',
+      component: () => import('@/views/daf/DafUsersView.vue'),
+      meta: { requiresAuth: true, layout: 'DashboardLayout', title: 'Utilisateurs', breadcrumb: ['DAF', 'Utilisateurs'] }
     },
     {
-      path: '/admin/consolidation',
-      name: 'admin-consolidation',
-      component: () => import('@/views/admin/AdminConsolidationView.vue'),
-      meta: { requiresAuth: true, layout: 'DashboardLayout', title: 'Consolidation', breadcrumb: ['Administration', 'Consolidation'] }
+      path: '/daf/parametres',
+      name: 'daf-parametres',
+      component: () => import('@/views/daf/DafParamsView.vue'),
+      meta: { requiresAuth: true, layout: 'DashboardLayout', title: 'Paramètres', breadcrumb: ['DAF', 'Paramètres'] }
     },
     {
-      path: '/admin/validation',
-      name: 'admin-validation',
-      component: () => import('@/views/admin/AdminValidationView.vue'),
-      meta: { requiresAuth: true, layout: 'DashboardLayout', title: 'Validation Primes', breadcrumb: ['Administration', 'Validation Primes'] }
+      path: '/daf/consolidation',
+      name: 'daf-consolidation',
+      component: () => import('@/views/daf/DafConsolidationView.vue'),
+      meta: { requiresAuth: true, layout: 'DashboardLayout', title: 'Consolidation', breadcrumb: ['DAF', 'Consolidation'] }
     },
     {
-      path: '/admin/rapports',
-      name: 'admin-rapports',
-      component: () => import('@/views/admin/AdminRapportsView.vue'),
-      meta: { requiresAuth: true, layout: 'DashboardLayout', title: 'Rapports & Export', breadcrumb: ['Administration', 'Rapports & Export'] }
+      path: '/daf/validation',
+      name: 'daf-validation',
+      component: () => import('@/views/daf/DafValidationView.vue'),
+      meta: { requiresAuth: true, layout: 'DashboardLayout', title: 'Validation Primes', breadcrumb: ['DAF', 'Validation Primes'] }
+    },
+    {
+      path: '/daf/rapports',
+      name: 'daf-rapports',
+      component: () => import('@/views/daf/DafRapportsView.vue'),
+      meta: { requiresAuth: true, layout: 'DashboardLayout', title: 'Rapports & Export', breadcrumb: ['DAF', 'Rapports & Export'] }
     }
   ]
 })
 
-// Simple Route Guard (mock)
-router.beforeEach((to, from, next) => {
-  const isAuthenticated = localStorage.getItem('token') // Mock auth
+// Route Guard
+router.beforeEach((to) => {
+  const token = localStorage.getItem('token')
+  const user = localStorage.getItem('user')
+  const isAuthenticated = !!(token && user)
 
-  if (to.meta.requiresAuth && !isAuthenticated && to.name !== 'login') {
-    next({ name: 'login' })
-  } else if (to.name === 'login' && isAuthenticated) {
-    next({ name: 'dashboard' })
-  } else {
-    next()
+  if (to.meta.requiresAuth && !isAuthenticated) {
+    return { name: 'landing' }
+  }
+  if (to.name === 'landing' && isAuthenticated) {
+    return { name: 'dashboard' }
+  }
+  if (to.name === 'login' && isAuthenticated) {
+    return { name: 'dashboard' }
   }
 })
 

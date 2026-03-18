@@ -12,7 +12,7 @@
       <div class="relative z-10">
         <div class="flex items-center gap-3 mb-2">
           <div class="w-14 h-14 rounded-xl flex items-center justify-center overflow-hidden bg-white">
-            <img src="/logo-clean-africa.jpg" alt="Clean Africa" class="w-full h-full object-contain" />
+            <img src="/logo-clean-africa.jpg" alt="Logo Clean Africa - Société d'État Gabon" class="w-full h-full object-contain" />
           </div>
           <div>
             <h1 class="text-white font-bold text-2xl tracking-wide">CLEAN AFRICA</h1>
@@ -59,7 +59,7 @@
         <div class="lg:hidden text-center mb-8">
           <div class="inline-flex items-center gap-3 mb-4">
             <div class="w-12 h-12 rounded-xl flex items-center justify-center overflow-hidden bg-white">
-              <img src="/logo-clean-africa.jpg" alt="Clean Africa" class="w-full h-full object-contain" />
+              <img src="/logo-clean-africa.jpg" alt="Logo Clean Africa - Société d'État Gabon" class="w-full h-full object-contain" />
             </div>
             <h1 class="text-white font-bold text-xl tracking-wide">CLEAN AFRICA</h1>
           </div>
