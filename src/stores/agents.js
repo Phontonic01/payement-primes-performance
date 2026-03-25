@@ -1,60 +1,59 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import AGENTS_OFFICIEL from '@/data/agents-officiel.json'
-
-// Base de données officielle — Source: Service RH, Mars 2026
-// 438 agents Collecte (DT) + 36 agents TRI (DQHSE)
-const AGENTS_DEMO = AGENTS_OFFICIEL
+import api from '@/api/client'
 
 export const useAgentsStore = defineStore('agents', () => {
-  // Source unique des agents — les chefs de service les ajoutent via DAF > Utilisateurs
   const agents = ref([])
+  const loading = ref(false)
+  const loaded = ref(false)
 
-  // Compteur auto-incrémenté pour les IDs
-  let nextId = 1
-
-  // Charger les agents de démonstration si le store est vide
-  function seedIfEmpty() {
-    if (agents.value.length === 0) {
-      AGENTS_DEMO.forEach(a => {
-        agents.value.push({ id: nextId++, ...a, statut: 'ACTIF' })
-      })
-    } else {
-      // Recalculer nextId depuis les agents existants
-      nextId = Math.max(...agents.value.map(a => a.id || 0)) + 1
+  // ── Charger les agents depuis l'API ──
+  async function fetchAgents(params = {}) {
+    loading.value = true
+    try {
+      agents.value = await api.getAgents(params)
+      loaded.value = true
+    } catch (e) {
+      console.error('Erreur chargement agents:', e.message)
+    } finally {
+      loading.value = false
     }
   }
 
-  // Présences par jour — Clé: "YYYY-MM-DD", Valeur: tableau de matricules présents
+  // ── Charger si pas encore fait ──
+  async function ensureLoaded() {
+    if (!loaded.value && !loading.value) await fetchAgents()
+  }
+
+  // ── Présences (restera local pour l'instant) ──
   const presences = ref({})
 
-  function ajouterAgent({ nom, matricule, role, zone, fonction, equipe, vehicule, service }) {
-    // Vérifier doublon matricule
-    if (agents.value.some(a => a.matricule === matricule)) {
-      return { success: false, message: `Le matricule ${matricule} existe déjà.` }
+  async function ajouterAgent(data) {
+    try {
+      await api.createAgent(data)
+      await fetchAgents() // Refresh
+      return { success: true }
+    } catch (e) {
+      return { success: false, message: e.message }
     }
-    agents.value.push({
-      id: nextId++,
-      nom,
-      matricule,
-      role,
-      zone,
-      fonction: fonction || role,
-      equipe: equipe || '',
-      vehicule: vehicule || '',
-      service: service || 'COLLECTE',
-      statut: 'ACTIF',
-    })
-    return { success: true }
   }
 
-  function supprimerAgent(matricule) {
-    agents.value = agents.value.filter(a => a.matricule !== matricule)
+  async function supprimerAgent(matricule) {
+    try {
+      await api.deleteAgent(matricule)
+      await fetchAgents()
+    } catch (e) {
+      console.error('Erreur suppression:', e.message)
+    }
   }
 
-  function modifierAgent(matricule, updates) {
-    const agent = agents.value.find(a => a.matricule === matricule)
-    if (agent) Object.assign(agent, updates)
+  async function modifierAgent(matricule, updates) {
+    try {
+      await api.updateAgent(matricule, updates)
+      await fetchAgents()
+    } catch (e) {
+      console.error('Erreur modification:', e.message)
+    }
   }
 
   function getAgentByMatricule(matricule) {
@@ -70,8 +69,7 @@ export const useAgentsStore = defineStore('agents', () => {
     const q = query.toLowerCase().trim()
     return agents.value.filter(a =>
       a.matricule.includes(q) ||
-      a.nom.toLowerCase().includes(q) ||
-      a.nom.toLowerCase().startsWith(q)
+      a.nom.toLowerCase().includes(q)
     )
   }
 
@@ -85,19 +83,24 @@ export const useAgentsStore = defineStore('agents', () => {
   }
 
   function enregistrerPresence(matricule, date) {
-    if (!presences.value[date]) {
-      presences.value[date] = []
-    }
+    if (!presences.value[date]) presences.value[date] = []
     if (!presences.value[date].includes(matricule)) {
       presences.value[date].push(matricule)
     }
   }
 
-  // seedIfEmpty() est appelé depuis main.js APRÈS la restauration localStorage
+  // Compat: seedIfEmpty charge depuis l'API au lieu du JSON local
+  async function seedIfEmpty() {
+    await ensureLoaded()
+  }
 
   return {
     agents,
+    loading,
+    loaded,
     presences,
+    fetchAgents,
+    ensureLoaded,
     ajouterAgent,
     supprimerAgent,
     modifierAgent,

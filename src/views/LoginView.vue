@@ -1,19 +1,27 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { LogIn, ArrowLeft } from 'lucide-vue-next'
+import { LogIn, ArrowLeft, AlertCircle } from 'lucide-vue-next'
 
 const authStore = useAuthStore()
 const route = useRoute()
 const router = useRouter()
 
-const username = ref('')
 const password = ref('')
-const role = ref('COLLECTE')
-const loading = ref(false)
+const selectedService = ref('COLLECTE')
 
-// Mapping service → label pour affichage
+// Mapping service → username du compte backend
+const serviceAccounts = {
+  DAF: 'daf',
+  COLLECTE: 'collecte',
+  GEO: 'geo',
+  LOGISTIQUE: 'logistique',
+  QHSE: 'qhse',
+  TRI: 'tri',
+  LECTURE: 'lecture',
+}
+
 const serviceLabels = {
   DAF: 'DAF — Direction Administrative et Financière',
   COLLECTE: 'Service Collecte',
@@ -24,7 +32,6 @@ const serviceLabels = {
   LECTURE: 'Consultation',
 }
 
-// Mapping service → route de destination après login
 const serviceRedirects = {
   DAF: '/daf/budget',
   COLLECTE: '/collecte/tonnage',
@@ -32,24 +39,21 @@ const serviceRedirects = {
   LOGISTIQUE: '/logistique/entretien',
   QHSE: '/qhse/checklist',
   TRI: '/tri/saisie',
-  LECTURE: '/',
+  LECTURE: '/dashboard',
 }
 
-// Pré-sélectionner le service depuis le query param
 onMounted(() => {
   if (route.query.service && serviceLabels[route.query.service]) {
-    role.value = route.query.service
+    selectedService.value = route.query.service
   }
 })
 
+const username = computed(() => serviceAccounts[selectedService.value] || 'collecte')
+
 async function handleLogin() {
-  if (username.value && role.value) {
-    loading.value = true
-    await new Promise(r => setTimeout(r, 400))
-    authStore.login(username.value, role.value)
-    loading.value = false
-    // Rediriger vers la page du service concerné
-    const redirect = serviceRedirects[role.value] || '/'
+  const result = await authStore.login(username.value, password.value)
+  if (result.success) {
+    const redirect = serviceRedirects[selectedService.value] || '/dashboard'
     router.push(redirect)
   }
 }
@@ -57,7 +61,7 @@ async function handleLogin() {
 
 <template>
   <div>
-    <!-- Bouton retour vers sélection services -->
+    <!-- Bouton retour -->
     <button
       @click="router.push({ name: 'landing' })"
       class="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-emerald-600 mb-5 transition-colors cursor-pointer"
@@ -69,69 +73,75 @@ async function handleLogin() {
     <!-- Service badge -->
     <div class="mb-6">
       <div
-        class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider mb-3"
+        class="inline-flex items-center px-3 py-1.5 rounded-full text-[11px] font-semibold uppercase tracking-wider mb-3"
         :class="{
-          'bg-emerald-50 text-emerald-700': role === 'COLLECTE',
-          'bg-blue-50 text-blue-700': role === 'GEO',
-          'bg-amber-50 text-amber-700': role === 'LOGISTIQUE',
-          'bg-purple-50 text-purple-700': role === 'QHSE',
-          'bg-teal-50 text-teal-700': role === 'TRI',
-          'bg-rose-50 text-rose-700': role === 'DAF',
-          'bg-gray-50 text-gray-700': role === 'LECTURE',
+          'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-500/10': selectedService === 'COLLECTE',
+          'bg-blue-50 text-blue-700 ring-1 ring-blue-500/10': selectedService === 'GEO',
+          'bg-amber-50 text-amber-700 ring-1 ring-amber-500/10': selectedService === 'LOGISTIQUE',
+          'bg-purple-50 text-purple-700 ring-1 ring-purple-500/10': selectedService === 'QHSE',
+          'bg-teal-50 text-teal-700 ring-1 ring-teal-500/10': selectedService === 'TRI',
+          'bg-rose-50 text-rose-700 ring-1 ring-rose-500/10': selectedService === 'DAF',
+          'bg-gray-50 text-gray-700 ring-1 ring-gray-500/10': selectedService === 'LECTURE',
         }"
       >
-        {{ serviceLabels[role] || role }}
+        {{ serviceLabels[selectedService] || selectedService }}
       </div>
-      <h2 class="text-2xl font-bold text-gray-900">Connexion</h2>
+      <h2 class="text-2xl font-bold text-gray-900 tracking-tight">Connexion</h2>
       <p class="mt-1 text-sm text-gray-500">Identifiez-vous pour accéder à votre espace</p>
     </div>
 
+    <!-- Erreur -->
+    <div v-if="authStore.loginError" class="mb-4 rounded-xl bg-red-50 border border-red-200/60 p-3 flex items-center gap-2.5">
+      <AlertCircle class="w-4 h-4 text-red-500 flex-shrink-0" />
+      <p class="text-sm text-red-700">{{ authStore.loginError }}</p>
+    </div>
+
     <form class="space-y-5" @submit.prevent="handleLogin">
+      <!-- Compte (auto-rempli selon le service) -->
       <div>
-        <label for="username" class="block text-sm font-medium text-gray-700 mb-1.5">Nom d'utilisateur</label>
+        <label class="block text-[13px] font-medium text-gray-600 mb-1.5">Compte service</label>
         <input
-          id="username"
-          v-model="username"
+          :value="username"
           type="text"
-          autocomplete="username"
-          required
-          placeholder="Entrez votre nom"
-          class="block w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm placeholder-gray-400 focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none"
+          disabled
+          class="block w-full px-3.5 py-2.5 bg-gray-100 border border-gray-200 rounded-xl text-sm text-gray-500 cursor-not-allowed"
         />
       </div>
 
+      <!-- Mot de passe -->
       <div>
-        <label for="password" class="block text-sm font-medium text-gray-700 mb-1.5">Mot de passe</label>
+        <label for="password" class="block text-[13px] font-medium text-gray-600 mb-1.5">Mot de passe</label>
         <input
           id="password"
           v-model="password"
           type="password"
           autocomplete="current-password"
+          required
           placeholder="••••••••"
-          class="block w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm placeholder-gray-400 focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none"
+          class="block w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm placeholder-gray-400 shadow-sm focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10 outline-none transition-colors"
         />
       </div>
 
       <button
         type="submit"
-        :disabled="loading || !username"
-        class="w-full flex items-center justify-center gap-2 py-3 px-4 text-white font-semibold rounded-xl text-sm shadow-lg cursor-pointer transition-all duration-200 disabled:bg-gray-300 disabled:cursor-not-allowed disabled:shadow-none"
+        :disabled="authStore.loginLoading || !password"
+        class="w-full flex items-center justify-center gap-2 py-3 px-4 text-white font-semibold rounded-xl text-sm shadow-sm cursor-pointer transition-all duration-200 active:scale-[0.98] disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed disabled:shadow-none"
         :class="{
-          'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/25 hover:shadow-emerald-700/30': role === 'COLLECTE',
-          'bg-blue-600 hover:bg-blue-700 shadow-blue-600/25 hover:shadow-blue-700/30': role === 'GEO',
-          'bg-amber-600 hover:bg-amber-700 shadow-amber-600/25 hover:shadow-amber-700/30': role === 'LOGISTIQUE',
-          'bg-purple-600 hover:bg-purple-700 shadow-purple-600/25 hover:shadow-purple-700/30': role === 'QHSE',
-          'bg-teal-600 hover:bg-teal-700 shadow-teal-600/25 hover:shadow-teal-700/30': role === 'TRI',
-          'bg-rose-600 hover:bg-rose-700 shadow-rose-600/25 hover:shadow-rose-700/30': role === 'DAF',
-          'bg-gray-600 hover:bg-gray-700 shadow-gray-600/25 hover:shadow-gray-700/30': role === 'LECTURE',
+          'bg-emerald-600 hover:bg-emerald-700': selectedService === 'COLLECTE',
+          'bg-blue-600 hover:bg-blue-700': selectedService === 'GEO',
+          'bg-amber-600 hover:bg-amber-700': selectedService === 'LOGISTIQUE',
+          'bg-purple-600 hover:bg-purple-700': selectedService === 'QHSE',
+          'bg-teal-600 hover:bg-teal-700': selectedService === 'TRI',
+          'bg-rose-600 hover:bg-rose-700': selectedService === 'DAF',
+          'bg-gray-600 hover:bg-gray-700': selectedService === 'LECTURE',
         }"
       >
-        <svg v-if="loading" class="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+        <svg v-if="authStore.loginLoading" class="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
           <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25" />
           <path d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" fill="currentColor" class="opacity-75" />
         </svg>
         <LogIn v-else class="w-4 h-4" />
-        <span>{{ loading ? 'Connexion...' : 'Se connecter' }}</span>
+        <span>{{ authStore.loginLoading ? 'Connexion...' : 'Se connecter' }}</span>
       </button>
     </form>
   </div>
