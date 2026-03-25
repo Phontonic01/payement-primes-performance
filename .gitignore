@@ -29,6 +29,10 @@ dist-ssr
 screenshots/
 .playwright-mcp/
 
+# Secrets
+.env
+.env.local
+
 # Database
 data/*.db
 data/*.db-wal

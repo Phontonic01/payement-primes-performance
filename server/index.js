@@ -1,3 +1,4 @@
+import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
@@ -10,6 +11,7 @@ import agentsRoutes from './routes/agents.js'
 import saisiesRoutes from './routes/saisies.js'
 import geoRoutes from './routes/geo.js'
 import configRoutes from './routes/config.js'
+import pontBasculeRoutes from './routes/pont-bascule.js'
 
 const app = express()
 const PORT = process.env.API_PORT || 3001
@@ -38,6 +40,7 @@ app.use('/api/agents', agentsRoutes)
 app.use('/api/saisies', saisiesRoutes)
 app.use('/api/geo', geoRoutes)
 app.use('/api/config', configRoutes)
+app.use('/api/pont-bascule', pontBasculeRoutes)
 
 // ═══ Health check ═══
 app.get('/api/health', (req, res) => {
