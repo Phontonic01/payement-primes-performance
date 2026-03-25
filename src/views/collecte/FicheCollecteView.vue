@@ -77,7 +77,7 @@ function imprimer() {
           <div class="flex items-center justify-between">
             <div>
               <h2 class="text-lg font-bold text-gray-900">FICHE DE COLLECTE JOURNALIÈRE</h2>
-              <p class="text-sm text-gray-500 mt-0.5">Clean Africa — Paiement Primes de Performance</p>
+              <p class="text-sm text-gray-500 mt-0.5">Clean Africa — Paiement de la Prime de Performance</p>
             </div>
             <div class="text-right">
               <p class="text-xs text-gray-400 font-medium">Référence</p>

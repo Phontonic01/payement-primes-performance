@@ -5,10 +5,27 @@ import { ref, computed } from 'vue'
  * Moteur de calcul des primes — conforme à la Note de Service
  * Réf: 25-11-001-DT-DQHSE-DRH-yar-DG du 05/11/2025
  *
+ * ═══ SERVICE COLLECTE ═══
  * Principe: Chaque agent démarre à 100% sur chaque axe.
  * Les infractions constatées font baisser les scores.
  * Score global = Tonnage(50%) + Bouclage(25%) + Entretien(15%) + QHSE(10%)
  * Prime = scoreGlobal% × plafond (si score ≥ 60%, sinon 0)
+ *
+ * ═══ SERVICE TRI & VALORISATION ═══
+ * Prime octroyée par équipe d'arrondissement (1 Canter + 1 BOM par zone).
+ * Le Canter charge la BOM de sa zone pour maximiser le temps de collecte.
+ *
+ * Barème BOM + CANTER (par tonnage collecté par l'équipe) :
+ *   - ≥ 1.2 tonne  → 100% de la prime
+ *   - ≥ 1.0 tonne  → 75% de la prime
+ *   - ≥ 0.8 tonne  → 50% de la prime
+ *   - < 0.8 tonne  → 0%
+ *
+ * Barème MOVI (par nombre de bennes levées) :
+ *   - ≥ 5 bennes levées → 100% de la prime
+ *   - ≥ 4 bennes levées → 75% de la prime
+ *   - ≥ 3 bennes levées → 50% de la prime
+ *   - < 3 bennes levées → 0%
  */
 export const usePrimesStore = defineStore('primes', () => {
 
@@ -32,6 +49,77 @@ export const usePrimesStore = defineStore('primes', () => {
       RIPEUR_TRI: 25000,
     }
   })
+
+  // ═══════════════════════════════════════════════
+  // SERVICE TRI — Barème et configuration
+  // ═══════════════════════════════════════════════
+
+  const configTri = ref({
+    plafondTri: 25000,  // Plafond prime TRI (XAF) — modifiable par note de service
+    // Barème BOM + Canter (tonnage en tonnes)
+    bomCanter: {
+      seuil100: 1.2,    // ≥ 1.2t → 100%
+      seuil75: 1.0,     // ≥ 1.0t → 75%
+      seuil50: 0.8,     // ≥ 0.8t → 50%
+    },
+    // Barème Movi (nombre de bennes levées)
+    movi: {
+      seuil100: 5,      // ≥ 5 bennes → 100%
+      seuil75: 4,        // ≥ 4 bennes → 75%
+      seuil50: 3,        // ≥ 3 bennes → 50%
+    },
+  })
+
+  /**
+   * Calcul de la prime TRI pour une équipe
+   *
+   * @param {string} typeEquipement - 'BOM_CANTER' ou 'MOVI'
+   * @param {number} valeur - Tonnage (en tonnes) pour BOM+Canter, ou nombre de bennes levées pour Movi
+   * @returns {{ pourcentage: number, montant: number, eligible: boolean, palier: string }}
+   */
+  function calculerPrimeTri(typeEquipement, valeur) {
+    const c = configTri.value
+    let pourcentage = 0
+    let palier = 'Insuffisant'
+
+    if (typeEquipement === 'BOM_CANTER') {
+      if (valeur >= c.bomCanter.seuil100) {
+        pourcentage = 100
+        palier = `≥ ${c.bomCanter.seuil100}t → 100%`
+      } else if (valeur >= c.bomCanter.seuil75) {
+        pourcentage = 75
+        palier = `≥ ${c.bomCanter.seuil75}t → 75%`
+      } else if (valeur >= c.bomCanter.seuil50) {
+        pourcentage = 50
+        palier = `≥ ${c.bomCanter.seuil50}t → 50%`
+      }
+    } else if (typeEquipement === 'MOVI') {
+      if (valeur >= c.movi.seuil100) {
+        pourcentage = 100
+        palier = `≥ ${c.movi.seuil100} bennes → 100%`
+      } else if (valeur >= c.movi.seuil75) {
+        pourcentage = 75
+        palier = `≥ ${c.movi.seuil75} bennes → 75%`
+      } else if (valeur >= c.movi.seuil50) {
+        pourcentage = 50
+        palier = `≥ ${c.movi.seuil50} bennes → 50%`
+      }
+    }
+
+    const montant = Math.round((pourcentage / 100) * c.plafondTri)
+
+    return {
+      pourcentage,
+      montant,
+      eligible: pourcentage > 0,
+      palier,
+      plafond: c.plafondTri,
+    }
+  }
+
+  // ═══════════════════════════════════════════════
+  // SERVICE COLLECTE — Barème Tonnage
+  // ═══════════════════════════════════════════════
 
   // ── Barème Tonnage par type de véhicule ──
   // Retourne le % de performance tonnage (0, 50, 75 ou 100)
@@ -205,12 +293,14 @@ export const usePrimesStore = defineStore('primes', () => {
   return {
     ponderations,
     config,
+    configTri,
     calculerScoreTonnage,
     calculerScoreBouclage,
     calculerScoreEntretien,
     calculerScoreQhse,
     calculerScoreGlobal,
     calculerPrime,
+    calculerPrimeTri,
     calculerFicheAgent,
   }
 })

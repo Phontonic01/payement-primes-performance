@@ -41,18 +41,18 @@ const router = createRouter({
       meta: { requiresAuth: true, layout: 'DashboardLayout', title: 'Fiche Collecte', breadcrumb: ['Collecte', 'Fiche Collecte'] }
     },
     {
-      path: '/collecte/bouclage',
-      name: 'collecte-bouclage',
-      component: () => import('@/views/collecte/BouclageDeclarationView.vue'),
-      meta: { requiresAuth: true, layout: 'DashboardLayout', title: 'Déclaration Bouclage', breadcrumb: ['Collecte', 'Déclaration Bouclage'] }
-    },
-    {
       path: '/collecte/historique',
       name: 'collecte-historique',
       component: () => import('@/views/collecte/HistoriqueSaisiesView.vue'),
       meta: { requiresAuth: true, layout: 'DashboardLayout', title: 'Historique Collecte', breadcrumb: ['Collecte', 'Historique Collecte'] }
     },
     // Géolocalisation
+    {
+      path: '/geo/bouclage',
+      name: 'geo-bouclage',
+      component: () => import('@/views/collecte/BouclageDeclarationView.vue'),
+      meta: { requiresAuth: true, layout: 'DashboardLayout', title: 'Déclaration Bouclage', breadcrumb: ['Géolocalisation', 'Déclaration Bouclage'] }
+    },
     {
       path: '/geo/tableau-de-bord',
       name: 'geo-tableau-de-bord',
@@ -110,16 +110,23 @@ const router = createRouter({
       meta: { requiresAuth: true, layout: 'DashboardLayout', title: 'Test Alcoolémie', breadcrumb: ['QHSE', 'Test Alcoolémie'] }
     },
     {
-      path: '/qhse/tri',
-      name: 'qhse-tri',
-      component: () => import('@/views/qhse/CollecteSelectiveView.vue'),
-      meta: { requiresAuth: true, layout: 'DashboardLayout', title: 'Collecte Sélective', breadcrumb: ['QHSE', 'Collecte Sélective'] }
-    },
-    {
       path: '/qhse/historique',
       name: 'qhse-historique',
       component: () => import('@/views/qhse/HistoriqueQhseView.vue'),
       meta: { requiresAuth: true, layout: 'DashboardLayout', title: 'Historique QHSE', breadcrumb: ['QHSE', 'Historique QHSE'] }
+    },
+    // TRI (Collecte Sélective)
+    {
+      path: '/tri/saisie',
+      name: 'tri-saisie',
+      component: () => import('@/views/tri/CollecteSelectiveView.vue'),
+      meta: { requiresAuth: true, layout: 'DashboardLayout', title: 'Saisie Pesée', breadcrumb: ['TRI', 'Saisie Pesée'] }
+    },
+    {
+      path: '/tri/historique',
+      name: 'tri-historique',
+      component: () => import('@/views/tri/HistoriqueTriView.vue'),
+      meta: { requiresAuth: true, layout: 'DashboardLayout', title: 'Historique TRI', breadcrumb: ['TRI', 'Historique TRI'] }
     },
     // DAF (Direction Administrative et Financière)
     {
@@ -150,7 +157,7 @@ const router = createRouter({
       path: '/daf/validation',
       name: 'daf-validation',
       component: () => import('@/views/daf/DafValidationView.vue'),
-      meta: { requiresAuth: true, layout: 'DashboardLayout', title: 'Validation Primes', breadcrumb: ['DAF', 'Validation Primes'] }
+      meta: { requiresAuth: true, layout: 'DashboardLayout', title: 'Validation Prime', breadcrumb: ['DAF', 'Validation Prime'] }
     },
     {
       path: '/daf/rapports',

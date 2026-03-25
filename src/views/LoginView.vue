@@ -19,7 +19,8 @@ const serviceLabels = {
   COLLECTE: 'Service Collecte',
   GEO: 'Service Géolocalisation',
   LOGISTIQUE: 'Service Logistique',
-  QHSE: 'Service QHSE / TRI',
+  QHSE: 'Service QHSE',
+  TRI: 'Service TRI',
   LECTURE: 'Consultation',
 }
 
@@ -30,6 +31,7 @@ const serviceRedirects = {
   GEO: '/geo/tableau-de-bord',
   LOGISTIQUE: '/logistique/entretien',
   QHSE: '/qhse/checklist',
+  TRI: '/tri/saisie',
   LECTURE: '/',
 }
 
@@ -73,6 +75,7 @@ async function handleLogin() {
           'bg-blue-50 text-blue-700': role === 'GEO',
           'bg-amber-50 text-amber-700': role === 'LOGISTIQUE',
           'bg-purple-50 text-purple-700': role === 'QHSE',
+          'bg-teal-50 text-teal-700': role === 'TRI',
           'bg-rose-50 text-rose-700': role === 'DAF',
           'bg-gray-50 text-gray-700': role === 'LECTURE',
         }"
@@ -118,6 +121,7 @@ async function handleLogin() {
           'bg-blue-600 hover:bg-blue-700 shadow-blue-600/25 hover:shadow-blue-700/30': role === 'GEO',
           'bg-amber-600 hover:bg-amber-700 shadow-amber-600/25 hover:shadow-amber-700/30': role === 'LOGISTIQUE',
           'bg-purple-600 hover:bg-purple-700 shadow-purple-600/25 hover:shadow-purple-700/30': role === 'QHSE',
+          'bg-teal-600 hover:bg-teal-700 shadow-teal-600/25 hover:shadow-teal-700/30': role === 'TRI',
           'bg-rose-600 hover:bg-rose-700 shadow-rose-600/25 hover:shadow-rose-700/30': role === 'DAF',
           'bg-gray-600 hover:bg-gray-700 shadow-gray-600/25 hover:shadow-gray-700/30': role === 'LECTURE',
         }"

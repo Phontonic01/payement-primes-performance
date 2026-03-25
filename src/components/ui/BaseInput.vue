@@ -16,15 +16,14 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue'])
 
-// Auto-generate id from label if not provided (accessibility: label must link to input)
 const inputId = computed(() => props.id || 'input-' + props.label.toLowerCase().replace(/[^a-z0-9]/g, '-'))
 </script>
 
 <template>
   <div class="space-y-1.5">
-    <label v-if="label" :for="inputId" class="block text-sm font-medium text-gray-700">
+    <label v-if="label" :for="inputId" class="block text-[13px] font-medium text-gray-600">
       {{ label }}
-      <span v-if="required" class="text-red-400">*</span>
+      <span v-if="required" class="text-red-400 ml-0.5">*</span>
     </label>
     <input
       :id="inputId"
@@ -38,7 +37,11 @@ const inputId = computed(() => props.id || 'input-' + props.label.toLowerCase().
       :disabled="disabled"
       :aria-required="required || undefined"
       @input="emit('update:modelValue', $event.target.value)"
-      class="block w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm placeholder-gray-400 focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+      class="block w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400
+             shadow-sm shadow-gray-900/[0.02]
+             focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10 outline-none
+             disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed
+             transition-colors duration-150"
     />
   </div>
 </template>

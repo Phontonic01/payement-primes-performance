@@ -26,7 +26,7 @@ function lancerMoteur() {
   <div class="space-y-6 max-w-4xl mx-auto">
     <div>
       <h1 class="text-2xl font-bold text-gray-900">Consolidation des Données (E52)</h1>
-      <p class="text-sm text-gray-500 mt-1">DAF - Lancement du moteur de calcul des primes</p>
+      <p class="text-sm text-gray-500 mt-1">DAF - Lancement du moteur de calcul de la prime</p>
     </div>
 
     <BaseCard>
@@ -89,7 +89,7 @@ function lancerMoteur() {
             <CheckCircle class="w-6 h-6 text-emerald-600" />
           </div>
           <p class="text-lg text-gray-700 mb-2"><strong>{{ nbAgents }}</strong> agents traités avec succès.</p>
-          <p class="text-sm text-gray-500 mb-6">Total des primes calculées (brouillon) : <strong class="text-gray-900">En attente de validation</strong></p>
+          <p class="text-sm text-gray-500 mb-6">Total de la prime calculée (brouillon) : <strong class="text-gray-900">En attente de validation</strong></p>
 
           <BaseButton @click="$router.push('/daf/validation')" variant="outline" class="border-emerald-200 text-emerald-700 hover:bg-emerald-50">
             Passer à la validation finale &rarr;

@@ -1,174 +1,258 @@
 <script setup>
 import { useRouter } from 'vue-router'
-import { Truck, MapPin, Wrench, ShieldCheck, Landmark, Eye } from 'lucide-vue-next'
+import { ref } from 'vue'
+import {
+  Truck, MapPin, Wrench, ShieldCheck, Recycle, Landmark, Eye,
+  ArrowRight, BarChart3, Shield, Zap, Clock, ChevronRight
+} from 'lucide-vue-next'
 
 const router = useRouter()
 
 const services = [
   {
     id: 'COLLECTE',
-    nom: 'Service Collecte',
-    description: 'Saisie tonnage, déclaration de bouclage circuit, suivi des performances chauffeurs et équipiers.',
+    nom: 'Collecte',
+    description: 'Saisie tonnage, bouclage circuit, suivi des performances chauffeurs et équipiers.',
     icon: Truck,
     couleur: 'emerald',
-    stats: '5 agents actifs',
   },
   {
     id: 'GEO',
-    nom: 'Service Géolocalisation',
-    description: 'Validation des traces GPS, vérification des bouclages terrain, analyse des parcours.',
+    nom: 'Géolocalisation',
+    description: 'Validation GPS, vérification des bouclages terrain, analyse des parcours.',
     icon: MapPin,
     couleur: 'blue',
-    stats: 'Validation GPS',
   },
   {
     id: 'LOGISTIQUE',
-    nom: 'Service Logistique',
-    description: 'Fiches d\'entretien véhicules, suivi du matériel roulant, état mécanique de la flotte.',
+    nom: 'Logistique',
+    description: 'Fiches d\'entretien, suivi matériel roulant, état mécanique de la flotte.',
     icon: Wrench,
     couleur: 'amber',
-    stats: '115+ véhicules',
   },
   {
     id: 'QHSE',
-    nom: 'Service QHSE / TRI',
-    description: 'Checklists terrain, contrôles d\'alcoolémie, conformité EPI, collecte sélective.',
+    nom: 'QHSE',
+    description: 'Checklists terrain, contrôles alcoolémie, conformité EPI.',
     icon: ShieldCheck,
     couleur: 'purple',
-    stats: 'Sécurité & Qualité',
+  },
+  {
+    id: 'TRI',
+    nom: 'TRI',
+    description: 'Collecte sélective, pesée des matériaux recyclables.',
+    icon: Recycle,
+    couleur: 'teal',
   },
   {
     id: 'DAF',
-    nom: 'Direction Administrative et Financière',
-    description: 'Vue budgétaire globale, consolidation, validation des primes, rapports et exports.',
+    nom: 'DAF',
+    description: 'Budget, consolidation, validation de la prime, rapports et exports.',
     icon: Landmark,
     couleur: 'rose',
-    stats: 'Vue globale',
   },
-  {
-    id: 'LECTURE',
-    nom: 'Consultation',
-    description: 'Accès en lecture seule au tableau de bord et aux données de performance.',
-    icon: Eye,
-    couleur: 'gray',
-    stats: 'Lecture seule',
-  },
+]
+
+const features = [
+  { icon: BarChart3, title: 'Calcul automatique', desc: 'Score pondéré sur 4 axes, seuils configurables, prime calculée en temps réel.' },
+  { icon: Shield, title: 'Traçabilité complète', desc: 'Chaque saisie, correction et validation est horodatée et tracée.' },
+  { icon: Zap, title: 'Temps réel', desc: 'Les données circulent entre services instantanément, sans ressaisie.' },
+  { icon: Clock, title: 'Cycle mensuel', desc: 'Du terrain à la DAF : saisie, validation, consolidation, paiement.' },
 ]
 
 function accederService(serviceId) {
   router.push({ name: 'login', query: { service: serviceId } })
 }
+
+function accederConsultation() {
+  router.push({ name: 'login', query: { service: 'LECTURE' } })
+}
+
+const colorMap = {
+  emerald: {
+    bg: 'bg-emerald-500/10 group-hover:bg-emerald-500/20',
+    icon: 'text-emerald-400',
+    border: 'border-emerald-500/20 group-hover:border-emerald-500/40',
+  },
+  blue: {
+    bg: 'bg-blue-500/10 group-hover:bg-blue-500/20',
+    icon: 'text-blue-400',
+    border: 'border-blue-500/20 group-hover:border-blue-500/40',
+  },
+  amber: {
+    bg: 'bg-amber-500/10 group-hover:bg-amber-500/20',
+    icon: 'text-amber-400',
+    border: 'border-amber-500/20 group-hover:border-amber-500/40',
+  },
+  purple: {
+    bg: 'bg-purple-500/10 group-hover:bg-purple-500/20',
+    icon: 'text-purple-400',
+    border: 'border-purple-500/20 group-hover:border-purple-500/40',
+  },
+  teal: {
+    bg: 'bg-teal-500/10 group-hover:bg-teal-500/20',
+    icon: 'text-teal-400',
+    border: 'border-teal-500/20 group-hover:border-teal-500/40',
+  },
+  rose: {
+    bg: 'bg-rose-500/10 group-hover:bg-rose-500/20',
+    icon: 'text-rose-400',
+    border: 'border-rose-500/20 group-hover:border-rose-500/40',
+  },
+}
 </script>
 
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-emerald-900 via-emerald-800 to-teal-900 relative overflow-hidden">
-    <!-- Decorative elements -->
-    <div class="absolute -top-40 -left-40 w-[500px] h-[500px] bg-emerald-500/10 rounded-full blur-3xl"></div>
-    <div class="absolute -bottom-40 -right-40 w-[600px] h-[600px] bg-teal-400/10 rounded-full blur-3xl"></div>
-    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-emerald-600/5 rounded-full blur-3xl"></div>
+  <div class="min-h-screen bg-[#0a0f1a] text-white">
 
-    <div class="relative z-10 max-w-6xl mx-auto px-6 py-12">
-      <!-- Header -->
-      <div class="text-center mb-12">
-        <div class="inline-flex items-center gap-4 mb-6">
-          <div class="w-16 h-16 rounded-2xl flex items-center justify-center overflow-hidden bg-white shadow-lg shadow-black/20">
+    <!-- ─── Navbar ─── -->
+    <nav class="sticky top-0 z-50 border-b border-white/[0.06] bg-[#0a0f1a]/80 backdrop-blur-xl">
+      <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-lg overflow-hidden bg-white flex-shrink-0">
             <img src="/logo-clean-africa.jpg" alt="Clean Africa" class="w-full h-full object-contain" />
           </div>
-          <div class="text-left">
-            <h1 class="text-white font-bold text-3xl tracking-wide">CLEAN AFRICA</h1>
-            <p class="text-emerald-300/60 text-xs font-medium tracking-widest uppercase">Société d'État — Gabon</p>
+          <div>
+            <span class="font-bold text-sm tracking-wide">CLEAN AFRICA</span>
+            <span class="hidden sm:inline text-[10px] text-white/30 ml-2 font-medium tracking-widest uppercase">Prime de Performance</span>
           </div>
         </div>
-        <h2 class="text-2xl md:text-3xl font-bold text-white mb-3">
-          Gestion des Primes <span class="text-emerald-400">de Performance</span>
-        </h2>
-        <p class="text-emerald-200/60 text-base max-w-xl mx-auto">
-          Sélectionnez votre service pour accéder à votre espace de travail
+        <button
+          @click="accederConsultation"
+          class="text-sm text-white/50 hover:text-white transition-colors cursor-pointer flex items-center gap-1.5"
+        >
+          <Eye class="w-4 h-4" />
+          <span class="hidden sm:inline">Consultation</span>
+        </button>
+      </div>
+    </nav>
+
+    <!-- ─── Hero ─── -->
+    <section class="relative overflow-hidden">
+      <!-- Gradient orbs -->
+      <div class="absolute top-0 left-1/4 w-[600px] h-[600px] bg-emerald-600/[0.07] rounded-full blur-[120px] pointer-events-none"></div>
+      <div class="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-teal-500/[0.05] rounded-full blur-[100px] pointer-events-none"></div>
+
+      <div class="relative max-w-6xl mx-auto px-6 pt-20 pb-16 sm:pt-28 sm:pb-20">
+        <!-- Badge -->
+        <div class="flex justify-center mb-8">
+          <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-500/[0.08] border border-emerald-500/20 text-emerald-400 text-xs font-medium">
+            <div class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></div>
+            Système opérationnel — Libreville, Gabon
+          </div>
+        </div>
+
+        <!-- Title -->
+        <h1 class="text-center text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-[1.1] tracking-tight">
+          <span class="text-white">Gestion de la Prime</span><br/>
+          <span class="bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-300 bg-clip-text text-transparent">de Performance</span>
+        </h1>
+        <p class="text-center text-white/40 text-lg sm:text-xl max-w-2xl mx-auto mt-6 leading-relaxed">
+          Évaluez, suivez et récompensez la performance de vos équipes de collecte avec transparence et précision.
         </p>
+
+        <!-- Stats row -->
+        <div class="flex justify-center mt-10">
+          <div class="inline-flex items-center gap-8 sm:gap-12 px-8 py-4 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
+            <div class="text-center">
+              <div class="text-2xl sm:text-3xl font-bold text-white">200+</div>
+              <div class="text-[11px] text-white/30 font-medium uppercase tracking-wider mt-0.5">Agents</div>
+            </div>
+            <div class="w-px h-10 bg-white/[0.08]"></div>
+            <div class="text-center">
+              <div class="text-2xl sm:text-3xl font-bold text-white">115+</div>
+              <div class="text-[11px] text-white/30 font-medium uppercase tracking-wider mt-0.5">Véhicules</div>
+            </div>
+            <div class="w-px h-10 bg-white/[0.08]"></div>
+            <div class="text-center">
+              <div class="text-2xl sm:text-3xl font-bold text-white">6</div>
+              <div class="text-[11px] text-white/30 font-medium uppercase tracking-wider mt-0.5">Services</div>
+            </div>
+            <div class="w-px h-10 bg-white/[0.08]"></div>
+            <div class="text-center">
+              <div class="text-2xl sm:text-3xl font-bold text-emerald-400">4</div>
+              <div class="text-[11px] text-white/30 font-medium uppercase tracking-wider mt-0.5">Axes d'éval.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── Services Grid ─── -->
+    <section class="max-w-6xl mx-auto px-6 pb-20">
+      <div class="text-center mb-10">
+        <h2 class="text-sm font-semibold text-white/30 uppercase tracking-widest mb-2">Accès par service</h2>
+        <p class="text-white/50 text-sm">Sélectionnez votre espace de travail pour commencer</p>
       </div>
 
-      <!-- Services Grid -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <button
           v-for="service in services"
           :key="service.id"
           @click="accederService(service.id)"
-          :aria-label="'Accéder au ' + service.nom"
-          class="group relative bg-white/[0.07] backdrop-blur-sm border border-white/10 rounded-2xl p-6 text-left transition-all duration-300 ease-out cursor-pointer
-                 hover:bg-white/[0.15] hover:border-white/25 hover:shadow-2xl hover:shadow-emerald-500/10 hover:scale-[1.03] hover:-translate-y-1
-                 focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:ring-offset-2 focus:ring-offset-emerald-900"
+          class="group relative text-left rounded-xl p-5 border transition-all duration-300 cursor-pointer
+                 bg-white/[0.02] hover:bg-white/[0.05]
+                 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:ring-offset-2 focus:ring-offset-[#0a0f1a]"
+          :class="colorMap[service.couleur].border"
         >
-          <!-- Glow effect on hover -->
-          <div class="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-            :class="{
-              'bg-gradient-to-br from-emerald-400/10 to-transparent': service.couleur === 'emerald',
-              'bg-gradient-to-br from-blue-400/10 to-transparent': service.couleur === 'blue',
-              'bg-gradient-to-br from-amber-400/10 to-transparent': service.couleur === 'amber',
-              'bg-gradient-to-br from-purple-400/10 to-transparent': service.couleur === 'purple',
-              'bg-gradient-to-br from-rose-400/10 to-transparent': service.couleur === 'rose',
-              'bg-gradient-to-br from-gray-400/10 to-transparent': service.couleur === 'gray',
-            }"
-          ></div>
-
-          <div class="relative z-10">
-            <!-- Icon -->
+          <div class="flex items-start gap-4">
             <div
-              class="w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-all duration-300 group-hover:scale-110 group-hover:shadow-lg"
-              :class="{
-                'bg-emerald-500/20 text-emerald-400 group-hover:bg-emerald-500/30 group-hover:shadow-emerald-500/20': service.couleur === 'emerald',
-                'bg-blue-500/20 text-blue-400 group-hover:bg-blue-500/30 group-hover:shadow-blue-500/20': service.couleur === 'blue',
-                'bg-amber-500/20 text-amber-400 group-hover:bg-amber-500/30 group-hover:shadow-amber-500/20': service.couleur === 'amber',
-                'bg-purple-500/20 text-purple-400 group-hover:bg-purple-500/30 group-hover:shadow-purple-500/20': service.couleur === 'purple',
-                'bg-rose-500/20 text-rose-400 group-hover:bg-rose-500/30 group-hover:shadow-rose-500/20': service.couleur === 'rose',
-                'bg-gray-500/20 text-gray-400 group-hover:bg-gray-500/30 group-hover:shadow-gray-500/20': service.couleur === 'gray',
-              }"
+              class="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors duration-300"
+              :class="[colorMap[service.couleur].bg, colorMap[service.couleur].icon]"
             >
-              <component :is="service.icon" class="w-6 h-6" />
+              <component :is="service.icon" class="w-5 h-5" />
             </div>
-
-            <!-- Content -->
-            <h3 class="text-white font-semibold text-base mb-2 group-hover:text-emerald-100 transition-colors">
-              {{ service.nom }}
-            </h3>
-            <p class="text-emerald-200/50 text-sm leading-relaxed mb-4 group-hover:text-emerald-200/70 transition-colors">
-              {{ service.description }}
-            </p>
-
-            <!-- Footer -->
-            <div class="flex items-center justify-between">
-              <span class="text-xs font-medium text-emerald-300/40 uppercase tracking-wider group-hover:text-emerald-300/60 transition-colors">
-                {{ service.stats }}
-              </span>
-              <span class="inline-flex items-center gap-1 text-xs font-medium text-emerald-400/60 group-hover:text-emerald-400 transition-all duration-300 group-hover:translate-x-1">
-                Accéder
-                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
-                </svg>
-              </span>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center justify-between">
+                <h3 class="text-white font-semibold text-sm group-hover:text-emerald-100 transition-colors">
+                  {{ service.nom }}
+                </h3>
+                <ChevronRight class="w-4 h-4 text-white/20 group-hover:text-white/50 group-hover:translate-x-0.5 transition-all duration-300 flex-shrink-0" />
+              </div>
+              <p class="text-white/35 text-xs leading-relaxed mt-1.5 group-hover:text-white/50 transition-colors">
+                {{ service.description }}
+              </p>
             </div>
           </div>
         </button>
       </div>
+    </section>
 
-      <!-- Footer stats -->
-      <div class="mt-12 flex justify-center gap-8">
-        <div class="text-center">
-          <div class="text-2xl font-bold text-white">115+</div>
-          <div class="text-emerald-300/40 text-xs uppercase tracking-wider mt-1">Véhicules</div>
-        </div>
-        <div class="w-px bg-emerald-500/20 self-stretch"></div>
-        <div class="text-center">
-          <div class="text-2xl font-bold text-white">5</div>
-          <div class="text-emerald-300/40 text-xs uppercase tracking-wider mt-1">Services</div>
-        </div>
-        <div class="w-px bg-emerald-500/20 self-stretch"></div>
-        <div class="text-center">
-          <div class="text-2xl font-bold text-white">200+</div>
-          <div class="text-emerald-300/40 text-xs uppercase tracking-wider mt-1">Agents</div>
+    <!-- ─── Features ─── -->
+    <section class="border-t border-white/[0.06]">
+      <div class="max-w-6xl mx-auto px-6 py-16">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div v-for="feat in features" :key="feat.title" class="text-center sm:text-left">
+            <div class="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-emerald-500/[0.08] text-emerald-400 mb-3">
+              <component :is="feat.icon" class="w-5 h-5" />
+            </div>
+            <h3 class="text-white font-semibold text-sm mb-1">{{ feat.title }}</h3>
+            <p class="text-white/30 text-xs leading-relaxed">{{ feat.desc }}</p>
+          </div>
         </div>
       </div>
+    </section>
 
-      <p class="text-center text-emerald-300/30 text-xs mt-8">Libreville, Gabon &mdash; Société d'État « CLEAN AFRICA »</p>
-    </div>
+    <!-- ─── Footer ─── -->
+    <footer class="border-t border-white/[0.04] bg-[#080c15]">
+      <div class="max-w-6xl mx-auto px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+          <div class="w-7 h-7 rounded-md overflow-hidden bg-white flex-shrink-0">
+            <img src="/logo-clean-africa.jpg" alt="Clean Africa" class="w-full h-full object-contain" />
+          </div>
+          <div>
+            <span class="text-white/40 text-xs font-medium">CLEAN AFRICA</span>
+            <span class="text-white/20 text-xs mx-1.5">·</span>
+            <span class="text-white/20 text-xs">Société d'État — Libreville, Gabon</span>
+          </div>
+        </div>
+        <div class="flex items-center gap-4 text-white/20 text-xs">
+          <span>Score = T(50%) + B(25%) + E(15%) + Q(10%)</span>
+          <span class="hidden sm:inline">·</span>
+          <span class="hidden sm:inline">Seuil 60% · Plafond 50K XAF</span>
+        </div>
+      </div>
+    </footer>
+
   </div>
 </template>

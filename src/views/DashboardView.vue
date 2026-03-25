@@ -80,7 +80,7 @@ const avgScoresByAxis = computed(() => {
   }
 })
 
-// ── Distribution des primes ──
+// ── Distribution de la prime ──
 const primeDistribution = computed(() => {
   const brackets = { zero: 0, low: 0, high: 0 }
   agentFiches.value.forEach(f => {
@@ -132,7 +132,7 @@ const kpis = computed(() => [
     icon: MapPin
   },
   {
-    label: 'Budget primes (est.)',
+    label: 'Budget prime (est.)',
     value: budgetFormate.value + ' XAF',
     change: nbAgents.value + ' agents',
     trend: 'neutral',
@@ -465,7 +465,7 @@ function scoreDotClass(score) {
             <BaseChart type="bar" :data="axisChartData" :options="axisChartOptions" />
           </div>
           <div class="bg-white rounded-xl border border-gray-100 p-5">
-            <h3 class="text-sm font-semibold text-gray-900 mb-4">Distribution des primes</h3>
+            <h3 class="text-sm font-semibold text-gray-900 mb-4">Distribution de la prime</h3>
             <div class="flex items-center justify-center">
               <div class="w-64">
                 <BaseChart type="doughnut" :data="primeChartData" :options="primeChartOptions" />

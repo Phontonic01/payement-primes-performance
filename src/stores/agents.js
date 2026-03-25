@@ -1,29 +1,10 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import AGENTS_OFFICIEL from '@/data/agents-officiel.json'
 
-// Agents de démonstration — chargés automatiquement si le store est vide
-const AGENTS_DEMO = [
-  { nom: 'Medza Ondo Scheila', matricule: '2823', role: 'CHAUFFEUR', zone: 'Libreville Centre', fonction: 'Chauffeur PL', equipe: 'Équipe BOM-01', vehicule: 'BOM N°484' },
-  { nom: 'Nzoghe Obame Patrick', matricule: '0946', role: 'CHAUFFEUR', zone: 'Owendo', fonction: 'Chauffeur PL', equipe: 'Équipe BOM-02', vehicule: 'BOM N°512' },
-  { nom: 'Moussavou Lendoye Brice', matricule: '1547', role: 'CHAUFFEUR', zone: 'PK8-PK12', fonction: 'Chauffeur PL', equipe: 'Équipe Bennes-01', vehicule: 'Bennes N°203' },
-  { nom: 'Ndong Essono Jean-Claude', matricule: '3012', role: 'CHAUFFEUR', zone: 'Akanda', fonction: 'Chauffeur PL', equipe: 'Équipe Plateaux-01', vehicule: 'Plateaux N°88' },
-  { nom: 'Mba Nguema Franck', matricule: '1823', role: 'CHAUFFEUR', zone: 'Nzeng-Ayong', fonction: 'Chauffeur PL', equipe: 'Équipe BOM-03', vehicule: 'BOM N°501' },
-  { nom: 'Obiang Nze Rodrigue', matricule: '2156', role: 'CHAUFFEUR', zone: 'Libreville Nord', fonction: 'Chauffeur PL', equipe: 'Équipe Movi-01', vehicule: 'Movi N°45' },
-  { nom: 'Essono Mba Thierry', matricule: '0734', role: 'CHAUFFEUR', zone: 'Libreville Sud', fonction: 'Chauffeur PL', equipe: 'Équipe BOM-04', vehicule: 'BOM N°522' },
-  { nom: 'Ondo Mengue Sylvie', matricule: '3456', role: 'CHAUFFEUR', zone: 'Owendo Port', fonction: 'Chauffeur PL', equipe: 'Équipe Bennes-02', vehicule: 'Bennes N°210' },
-  { nom: 'Bekale Bi Nzue Hervé', matricule: '1290', role: 'EQUIPIER', zone: 'Libreville Centre', fonction: 'Ripeur', equipe: 'Équipe BOM-01', vehicule: '' },
-  { nom: 'Mboumba Ella Serge', matricule: '2478', role: 'EQUIPIER', zone: 'Libreville Centre', fonction: 'Ripeur', equipe: 'Équipe BOM-01', vehicule: '' },
-  { nom: 'Ntoutoume Akoure Cédric', matricule: '0512', role: 'EQUIPIER', zone: 'Owendo', fonction: 'Ripeur', equipe: 'Équipe BOM-02', vehicule: '' },
-  { nom: 'Mintsa Mi Owono Léa', matricule: '3789', role: 'EQUIPIER', zone: 'Owendo', fonction: 'Ripeur', equipe: 'Équipe BOM-02', vehicule: '' },
-  { nom: 'Edzang Nkoghe Blaise', matricule: '1678', role: 'EQUIPIER', zone: 'PK8-PK12', fonction: 'Ripeur', equipe: 'Équipe Bennes-01', vehicule: '' },
-  { nom: 'Avome Mba Christelle', matricule: '2901', role: 'EQUIPIER', zone: 'Akanda', fonction: 'Ripeur', equipe: 'Équipe Plateaux-01', vehicule: '' },
-  { nom: 'Ella Nguema Prosper', matricule: '0423', role: 'EQUIPIER', zone: 'Nzeng-Ayong', fonction: 'Ripeur', equipe: 'Équipe BOM-03', vehicule: '' },
-  { nom: 'Bivigou Koumba Aristide', matricule: '3145', role: 'EQUIPIER', zone: 'Libreville Nord', fonction: 'Ripeur', equipe: 'Équipe Movi-01', vehicule: '' },
-  { nom: 'Nguema Obame Fabrice', matricule: '1956', role: 'EQUIPIER', zone: 'Libreville Sud', fonction: 'Ripeur', equipe: 'Équipe BOM-04', vehicule: '' },
-  { nom: 'Mounanga Ndjambou Yves', matricule: '2634', role: 'EQUIPIER', zone: 'Owendo Port', fonction: 'Ripeur', equipe: 'Équipe Bennes-02', vehicule: '' },
-  { nom: 'Oyane Nzame Berthe', matricule: '0867', role: 'GEO', zone: 'Siège', fonction: 'Technicien GPS', equipe: '', vehicule: '' },
-  { nom: 'Assoumou Ndong Michel', matricule: '4012', role: 'QHSE', zone: 'Siège', fonction: 'Contrôleur QHSE', equipe: '', vehicule: '' },
-]
+// Base de données officielle — Source: Service RH, Mars 2026
+// 438 agents Collecte (DT) + 36 agents TRI (DQHSE)
+const AGENTS_DEMO = AGENTS_OFFICIEL
 
 export const useAgentsStore = defineStore('agents', () => {
   // Source unique des agents — les chefs de service les ajoutent via DAF > Utilisateurs
@@ -47,7 +28,7 @@ export const useAgentsStore = defineStore('agents', () => {
   // Présences par jour — Clé: "YYYY-MM-DD", Valeur: tableau de matricules présents
   const presences = ref({})
 
-  function ajouterAgent({ nom, matricule, role, zone, fonction, equipe, vehicule }) {
+  function ajouterAgent({ nom, matricule, role, zone, fonction, equipe, vehicule, service }) {
     // Vérifier doublon matricule
     if (agents.value.some(a => a.matricule === matricule)) {
       return { success: false, message: `Le matricule ${matricule} existe déjà.` }
@@ -61,6 +42,7 @@ export const useAgentsStore = defineStore('agents', () => {
       fonction: fonction || role,
       equipe: equipe || '',
       vehicule: vehicule || '',
+      service: service || 'COLLECTE',
       statut: 'ACTIF',
     })
     return { success: true }

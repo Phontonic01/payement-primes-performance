@@ -29,6 +29,11 @@ dist-ssr
 screenshots/
 .playwright-mcp/
 
+# Database
+data/*.db
+data/*.db-wal
+data/*.db-shm
+
 # Large binary files
 *.pdf
 *.jpg

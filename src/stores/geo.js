@@ -153,37 +153,9 @@ export const useGeoStore = defineStore('geo', () => {
     }
   })
 
-  // ── Charger des décisions mock pour la démo ──
+  // ── Charger des données de démonstration (vide — en attente de données officielles) ──
   function chargerDemoData() {
-    enregistrerDecision({
-      matricule: '2948', date: '2025-12-09', agent: 'Mamfoumbi Muriella', circuit: 'Owendo Port',
-      statut: 'PARTIEL', couvertureGps: 72,
-      justification: 'Zone sud non couverte selon la trace GPS. Couverture réelle à 72%.',
-      gpsData: { kmParcourus: 31.8, tempsCircuit: '4h05', arrets: 7 },
-      divergences: [
-        { service: 'Collecte', message: 'Bouclage déclaré OUI mais couverture GPS à 72%' },
-        { service: 'QHSE', message: 'Alcootest positif + 7 arrêts inhabituels détectés' },
-      ],
-    })
-
-    enregistrerDecision({
-      matricule: '0943', date: '2025-12-09', agent: 'Tsamba Tchewarny', circuit: 'Owendo Plage',
-      statut: 'REFUSE', couvertureGps: 45,
-      justification: 'Circuit largement incomplet. Couverture GPS à 45%. Temps anormalement court (2h30 au lieu de 5h+ habituel).',
-      gpsData: { kmParcourus: 18.3, tempsCircuit: '2h30', arrets: 1 },
-      divergences: [
-        { service: 'Collecte', message: 'Bouclage déclaré OUI mais couverture à 45% — circuit incomplet' },
-        { service: 'Collecte', message: '15t déclarées mais temps circuit anormalement court' },
-      ],
-    })
-
-    enregistrerDecision({
-      matricule: '2768', date: '2025-12-09', agent: 'Tengou Joram', circuit: 'Libreville Centre',
-      statut: 'VALIDE', couvertureGps: 100,
-      justification: 'Circuit complet. Trace GPS conforme à 100%.',
-      gpsData: { kmParcourus: 52.1, tempsCircuit: '6h10', arrets: 4 },
-      divergences: [],
-    })
+    // Pas de données démo — les décisions seront saisies par le service GEO
   }
 
   return {

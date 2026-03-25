@@ -145,7 +145,7 @@ function getCouleurClasses(couleur, type = 'bg') {
     <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
       <div>
         <h1 class="text-2xl font-bold text-gray-900">Vue Budgétaire Globale</h1>
-        <p class="text-sm text-gray-500 mt-1">DAF — Enveloppes budgétaires par service pour le paiement des primes</p>
+        <p class="text-sm text-gray-500 mt-1">DAF — Enveloppes budgétaires par service pour le paiement de la prime</p>
       </div>
       <div class="flex items-center gap-3">
         <label class="text-sm font-medium text-gray-600">Période :</label>
