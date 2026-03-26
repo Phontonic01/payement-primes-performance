@@ -40,8 +40,8 @@ export const usePrimesStore = defineStore('primes', () => {
   // ── Seuils et plafonds ──
   const config = ref({
     seuilMinPrime: 60,            // En dessous de 60%, pas de prime
-    seuilPresence: 93,            // 93% de présence minimum (28j/30)
-    joursOuvresMois: 30,
+    seuilPresence: 93,            // 93% de présence minimum
+    joursOuvresMois: 20,
     plafonds: {
       CHAUFFEUR_COLLECTE: 50000,  // Chauffeurs PL Collecte + Ripeurs éboueurs
       RIPEUR_COLLECTE: 50000,

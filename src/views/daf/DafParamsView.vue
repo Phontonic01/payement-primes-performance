@@ -217,7 +217,7 @@ const unlockedClass = 'bg-white border border-amber-300 text-gray-900 focus:outl
                 :disabled="!noteDeServiceActive"
                 :class="[inputClass, 'text-left', noteDeServiceActive ? unlockedClass : lockedClass]"
               />
-              <p class="text-xs text-gray-400 mt-1">28 jours / 30 = 93% (actuel: {{ primesStore.config.seuilPresence }}%)</p>
+              <p class="text-xs text-gray-400 mt-1">Seuil minimum : {{ primesStore.config.seuilPresence }}%</p>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-600 mb-1.5">

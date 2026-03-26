@@ -3,7 +3,6 @@ import { ref, computed } from 'vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
-import AgentSearchInput from '@/components/ui/AgentSearchInput.vue'
 import { ClipboardCheck, Gauge } from 'lucide-vue-next'
 import { useToastStore } from '@/stores/toast'
 import { useSaisiesStore } from '@/stores/saisies'
@@ -16,11 +15,6 @@ const saisiesStore = useSaisiesStore()
 const authStore = useAuthStore()
 const vehiculesStore = useVehiculesStore()
 const readOnly = computed(() => authStore.isReadOnly())
-const selectedAgent = ref(null)
-
-function onAgentSelected(agentObj) {
-  selectedAgent.value = agentObj
-}
 
 const form = ref({
   date: new Date().toISOString().split('T')[0],
@@ -38,14 +32,14 @@ const scoreEntretien = computed(() => {
 })
 
 function submitForm() {
-  if (!selectedAgent.value || !form.value.vehicule) {
-    toastStore.addToast('Veuillez remplir tous les champs obligatoires.', 'warning')
+  if (!form.value.vehicule) {
+    toastStore.addToast('Veuillez selectionner un vehicule.', 'warning')
     return
   }
   saisiesStore.enregistrerEntretien({
-    matricule: selectedAgent.value.matricule,
+    matricule: form.value.vehicule,
     date: form.value.date,
-    agent: selectedAgent.value.nom,
+    agent: form.value.vehicule,
     vehicule: form.value.vehicule,
     etatMecanique: form.value.etatMecanique,
     proprete: form.value.proprete,
@@ -53,8 +47,7 @@ function submitForm() {
     degradations: form.value.observations,
     note: scoreEntretien.value,
   })
-  toastStore.addToast(`Fiche d'entretien enregistrée pour ${selectedAgent.value.nom}. Score: ${scoreEntretien.value.toFixed(1)}/10`, 'success')
-  selectedAgent.value = null
+  toastStore.addToast(`Fiche d'entretien enregistree pour ${form.value.vehicule}. Score: ${scoreEntretien.value.toFixed(1)}/10`, 'success')
   form.value = {
     date: new Date().toISOString().split('T')[0],
     agent: '',
@@ -84,19 +77,8 @@ function submitForm() {
 
         <!-- Identity Fields -->
         <div class="p-6">
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <BaseInput v-model="form.date" type="date" label="Date d'evaluation" required />
-
-            <div>
-              <AgentSearchInput
-                v-model="form.agent"
-                :date="form.date"
-                :filter-presents="false"
-                label="Chauffeur évalué"
-                required
-                @agent-selected="onAgentSelected"
-              />
-            </div>
 
             <div class="space-y-1.5">
               <label class="block text-sm font-medium text-gray-900">Véhicule du parc <span class="text-red-500">*</span></label>

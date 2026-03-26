@@ -79,7 +79,7 @@ export const usePontBasculeStore = defineStore('pontBascule', () => {
     const totalPenalites = list.reduce((s, c) => s + c.penalites.total, 0)
     const nbEligibles = list.filter(c => c.prime_finale > 0).length
     const nbProrata = list.filter(c => c.prorata).length
-    const presenceMoyenne = list.reduce((s, c) => s + c.jours_present, 0) / list.length
+    const presenceMoyenne = list.reduce((s, c) => s + (c.taux_presence || 0), 0) / list.length
     const nbJour = list.filter(c => c.equipe === 'JOUR').length
     const nbNuit = list.filter(c => c.equipe === 'NUIT').length
 

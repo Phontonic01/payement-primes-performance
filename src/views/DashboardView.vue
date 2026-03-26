@@ -135,7 +135,7 @@ const kpis = computed(() => {
     },
     {
       label: 'Présence moyenne',
-      value: pbStats ? pbStats.presenceMoyenne + ' j/30' : '—',
+      value: pbStats ? (pbStats.presenceMoyenne / 20 * 100).toFixed(0) + ' %' : '—',
       change: pbStats ? `${pbStats.nbProrata} agent(s) en prorata` : '',
       trend: 'neutral',
       color: 'indigo',

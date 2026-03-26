@@ -142,7 +142,7 @@ router.get('/vehicules-du-jour', async (req, res) => {
       presence.forEach(c => { presenceMap[c.code_transporteur] = c.jours_present })
     } catch { /* presence non bloquante */ }
 
-    const joursOuvres = 30
+    const joursOuvres = 20
 
     // Convertir en tableau trié par tonnage décroissant
     const vehicules = Object.values(parVehicule).map(v => {
@@ -173,7 +173,7 @@ router.get('/presence', async (req, res) => {
   const mois = req.query.mois || new Date().toISOString().slice(0, 7)
   try {
     const presence = await getPresenceMensuelle(mois)
-    const joursOuvres = 30
+    const joursOuvres = 20
     const seuilPresence = 0.93
     res.json({
       mois,
@@ -195,6 +195,28 @@ router.get('/bilan', async (req, res) => {
   const mois = req.query.mois || new Date().toISOString().slice(0, 7)
   try {
     const bilan = await getBilanMensuel(mois)
+
+    // Enrichir chaque chauffeur avec direction/service/fonction depuis la base locale
+    const agentsLocaux = db.prepare('SELECT nom, direction, service, role, fonction FROM agents WHERE statut = ?').all('ACTIF')
+
+    // Index par nom (approximatif) pour matcher avec le pont-bascule
+    for (const c of bilan.chauffeurs) {
+      const nomPB = c.chauffeur.toUpperCase().trim()
+      const match = agentsLocaux.find(a => {
+        const nomLocal = a.nom.toUpperCase().trim()
+        // Match exact ou partiel (nom contenu)
+        return nomLocal === nomPB ||
+          nomLocal.includes(nomPB) ||
+          nomPB.includes(nomLocal) ||
+          // Match par premier + dernier mot
+          nomPB.split(' ')[0] === nomLocal.split(' ')[0]
+      })
+      c.direction = match?.direction || ''
+      c.service = match?.service || 'COLLECTE'
+      c.role = match?.role || ''
+      c.fonction = match?.fonction || ''
+    }
+
     res.json(bilan)
   } catch (err) {
     res.status(503).json({ error: err.message })

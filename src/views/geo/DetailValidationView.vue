@@ -174,16 +174,23 @@ async function valider(statut) {
             </template>
             <dl class="space-y-3 text-sm">
               <div class="flex justify-between">
-                <dt class="text-gray-500">Agent</dt>
+                <dt class="text-gray-500">Chauffeur</dt>
                 <dd class="font-semibold text-gray-900">{{ agent.nom }}</dd>
               </div>
               <div class="flex justify-between">
                 <dt class="text-gray-500">Matricule</dt>
-                <dd class="font-mono text-gray-900">{{ agent.matricule }}</dd>
+                <dd class="font-mono font-bold text-emerald-700">{{ agent.matricule }}</dd>
               </div>
               <div class="flex justify-between">
                 <dt class="text-gray-500">Date</dt>
                 <dd class="text-gray-900">{{ formatDate(dateIso) }}</dd>
+              </div>
+              <div class="flex justify-between">
+                <dt class="text-gray-500">Vehicule</dt>
+                <dd class="font-mono font-semibold text-gray-900">
+                  {{ tonnageData?.immatriculation || '—' }}
+                  <span v-if="tonnageData?.noParc" class="text-blue-600">(N°{{ tonnageData.noParc }})</span>
+                </dd>
               </div>
               <div class="flex justify-between">
                 <dt class="text-gray-500">Circuit</dt>

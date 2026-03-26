@@ -12,12 +12,14 @@ import { useConfirmStore } from '@/stores/confirm'
 import { useAgentsStore } from '@/stores/agents'
 import { usePrimesStore } from '@/stores/primes'
 import { useSaisiesStore } from '@/stores/saisies'
+import { usePontBasculeStore } from '@/stores/pontBascule'
 
 const toastStore = useToastStore()
 const confirmStore = useConfirmStore()
 const agentsStore = useAgentsStore()
 const primesStore = usePrimesStore()
 const saisiesStore = useSaisiesStore()
+const pontBasculeStore = usePontBasculeStore()
 
 const moisCourant = (() => {
   const d = new Date()
@@ -86,39 +88,41 @@ function toggleAgent(matricule) {
   expandedAgent.value = expandedAgent.value === matricule ? null : matricule
 }
 
-// ── Calcul des résultats ──
+// ── Calcul des résultats depuis le pont-bascule ──
 const resultats = computed(() => {
-  return agentsStore.agents
-    .filter(a => ['CHAUFFEUR', 'EQUIPIER'].includes(a.role))
-    .map(agent => {
-      const agregation = saisiesStore.getAgregationMensuelle(agent.matricule, moisCourant)
-      const typeAgent = agent.role === 'EQUIPIER' ? 'RIPEUR_COLLECTE' : 'CHAUFFEUR_COLLECTE'
-      const fiche = primesStore.calculerFicheAgent({
-        typeVehicule: agregation.typeVehicule,
-        typeAgent,
-        joursPresents: 28,
-        tonnageMoyen: agregation.tonnageMoyen,
-        rotationsMoyennes: agregation.rotationsMoyennes,
-        statutsBouclage: agregation.statutsBouclage,
-        noteEntretienMoyenne: agregation.noteEntretienMoyenne,
-        qhseData: agregation.qhseData,
-      })
-
-      const ajust = ajustements.value[agent.matricule]
-      const montantFinal = ajust ? ajust.montant : fiche.prime.montant
-
+  // Priorité : chauffeurs du bilan pont-bascule
+  const chauffeurs = pontBasculeStore.chauffeurs
+  if (chauffeurs.length > 0) {
+    return chauffeurs.map(c => {
+      const ajust = ajustements.value[c.code_transporteur]
+      const montantFinal = ajust ? ajust.montant : c.prime_finale
       return {
-        ...agent,
-        fiche,
-        agregation,
-        typeAgent,
-        montantCalcule: fiche.prime.montant,
+        matricule: c.code_transporteur,
+        nom: c.chauffeur,
+        role: c.role || 'CHAUFFEUR',
+        direction: c.direction || '',
+        equipe: c.equipe,
+        fiche: {
+          scores: { tonnage: 0, bouclage: 100, entretien: 100, qhse: 100 },
+          scoreGlobal: c.plafond > 0 ? (c.prime_finale / c.plafond) * 100 : 0,
+          prime: { montant: c.prime_finale, eligible: c.prime_finale > 0 },
+          penalites: c.penalites,
+          plafond: c.plafond,
+        },
+        typeAgent: 'CHAUFFEUR_COLLECTE',
+        montantCalcule: c.prime_finale,
         montantFinal,
+        primeAvantPresence: c.prime_avant_presence,
+        tauxPresence: c.taux_presence,
+        prorata: c.prorata,
         ajuste: !!ajust,
         motifAjustement: ajust?.motif || '',
-        demande: demandesInfos.value[agent.matricule] || null,
+        demande: demandesInfos.value[c.code_transporteur] || null,
       }
     })
+  }
+  // Fallback : pas de données pont-bascule
+  return []
 })
 
 const filteredResultats = computed(() => {

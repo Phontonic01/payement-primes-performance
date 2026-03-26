@@ -19,11 +19,13 @@ onMounted(() => { setTimeout(() => { loading.value = false }, 500) })
 
 const columns = [
   { key: 'dateFr', label: 'Date' },
-  { key: 'agent', label: 'Agent' },
+  { key: 'matricule', label: 'Matricule' },
+  { key: 'agent', label: 'Chauffeur' },
+  { key: 'vehicule', label: 'Vehicule' },
   { key: 'circuit', label: 'Circuit' },
-  { key: 'statut', label: 'Statut Validé' },
+  { key: 'statut', label: 'Statut' },
   { key: 'justification', label: 'Justification' },
-  { key: 'etat', label: 'État' },
+  { key: 'etat', label: 'Etat' },
 ]
 
 // Lire depuis le store GEO (décisions rendues)
@@ -34,7 +36,9 @@ const historiques = computed(() => {
       id: i + 1,
       date: d.date,
       dateFr: formatDateFr(d.date),
+      matricule: d.matricule || '—',
       agent: d.agent,
+      vehicule: d.gpsData?.vehicule || d.circuit || '—',
       circuit: d.circuit,
       statut: d.statut,
       justification: d.justification || '—',

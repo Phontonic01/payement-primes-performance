@@ -518,7 +518,7 @@ function submit() {
               </p>
               <p class="text-[10px] text-gray-500">
                 Score: {{ estimerPrime(selectedVehicule).scoreGlobal.toFixed(0) }}%
-                · {{ estimerPrime(selectedVehicule).joursPresent }}j présent
+                · Presence {{ estimerPrime(selectedVehicule).tauxPresence }}%
               </p>
             </div>
           </div>
@@ -556,8 +556,8 @@ function submit() {
                 QHSE (10%): {{ estimerPrime(selectedVehicule).penalites.qhse > 0 ? '-' + estimerPrime(selectedVehicule).penalites.qhse.toLocaleString() + ' F' : '✓ OK' }}
               </span>
               <span class="ml-auto" :class="estimerPrime(selectedVehicule).tauxPresence >= 93 ? 'text-emerald-500' : 'text-amber-500'">
-                Présence: {{ estimerPrime(selectedVehicule).joursPresent }}j/{{ joursOuvresMois }} ({{ estimerPrime(selectedVehicule).tauxPresence }}%)
-                {{ estimerPrime(selectedVehicule).prorata ? '→ prorata' : '' }}
+                Presence: {{ estimerPrime(selectedVehicule).tauxPresence }}%
+                {{ estimerPrime(selectedVehicule).prorata ? '(prorata)' : '' }}
               </span>
             </div>
           </div>
@@ -603,7 +603,7 @@ function submit() {
                       class="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-bold font-mono"
                       :class="v.taux_presence >= 93 ? 'text-emerald-700 bg-emerald-50' : v.taux_presence >= 80 ? 'text-amber-700 bg-amber-50' : 'text-red-700 bg-red-50'"
                     >
-                      {{ v.jours_present }}j <span class="font-normal text-[10px] opacity-70">/ {{ joursOuvresMois }}</span>
+                      {{ v.taux_presence }}%
                     </span>
                   </td>
                   <td class="px-3 py-3 text-right">
@@ -638,7 +638,7 @@ function submit() {
             <!-- Légende -->
             <div class="px-4 py-2.5 bg-gray-50 border-t border-gray-100 flex flex-wrap gap-4 text-[11px] text-gray-500">
               <span>Plafond : <strong class="text-gray-700">{{ plafond.toLocaleString() }} F</strong></span>
-              <span>Présence requise : <strong class="text-gray-700">{{ seuilPresence }}% ({{ Math.ceil(joursOuvresMois * seuilPresence / 100) }}j/{{ joursOuvresMois }})</strong></span>
+              <span>Presence requise : <strong class="text-gray-700">{{ seuilPresence }}%</strong></span>
               <span>Seuil min prime : <strong class="text-gray-700">{{ primesStore.config.seuilMinPrime }}%</strong></span>
               <span class="text-[10px] italic">Pénalités = plafond – (score × plafond)</span>
             </div>
@@ -865,7 +865,7 @@ function submit() {
                     QHSE: {{ estimerPrime(selectedVehicule).penalites.qhse > 0 ? '-' + estimerPrime(selectedVehicule).penalites.qhse.toLocaleString() : '✓' }}
                   </span>
                   <span class="px-1.5 py-0.5 rounded" :class="estimerPrime(selectedVehicule).tauxPresence >= 93 ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'">
-                    Présence: {{ estimerPrime(selectedVehicule).joursPresent }}j/{{ joursOuvresMois }}
+                    Presence: {{ estimerPrime(selectedVehicule).tauxPresence }}%
                     {{ estimerPrime(selectedVehicule).prorata ? '(prorata)' : '✓' }}
                   </span>
                 </div>

@@ -11,6 +11,7 @@ import { useVehiculesStore } from '@/stores/vehicules'
 
 const toastStore = useToastStore()
 const vehiculesStore = useVehiculesStore()
+const selectedAgentRestitution = ref(null)
 
 // ── Flotte véhicules (depuis le store) ──
 const flotteColumns = [
@@ -46,6 +47,7 @@ const restitutionForm = ref({
 function resetRestitution() {
   restitutionForm.value.agent = ''
   restitutionForm.value.observations = ''
+  selectedAgentRestitution.value = null
   equipements.forEach(e => {
     restitutionForm.value.items[e.id] = { sorti: true, restitue: false, etat: 'BON' }
   })
@@ -71,16 +73,15 @@ const scoreRestitution = computed(() => {
 })
 
 function submitRestitution() {
-  if (!restitutionForm.value.agent) {
-    toastStore.addToast('Veuillez sélectionner un agent.', 'warning')
+  if (!selectedAgentRestitution.value) {
+    toastStore.addToast('Veuillez selectionner un agent.', 'warning')
     return
   }
   const s = scoreRestitution.value
-  // Persister dans l'historique local
   historiqueRestitutions.value.unshift({
     id: historiqueRestitutions.value.length + 1,
     date: restitutionForm.value.date,
-    agent: restitutionForm.value.agent,
+    agent: selectedAgentRestitution.value.nom + ' (' + selectedAgentRestitution.value.matricule + ')',
     equipements: `${s.total} sortis`,
     restitues: `${s.restitues}/${s.total}`,
     etat: s.restitues === s.total ? 'COMPLET' : 'INCOMPLET',
@@ -191,9 +192,11 @@ const historiqueRestitutions = ref([])
           <AgentSearchInput
             v-model="restitutionForm.agent"
             :date="restitutionForm.date"
-            :filter-presents="true"
-            label="Agent concerné"
+            :filter-presents="false"
+            label="Agent concerne"
+            placeholder="Tapez un nom ou matricule..."
             required
+            @agent-selected="(a) => selectedAgentRestitution = a"
           />
           <div class="space-y-1.5">
             <label class="block text-sm font-medium text-gray-700">Date</label>

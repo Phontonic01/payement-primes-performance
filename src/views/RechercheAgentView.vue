@@ -240,7 +240,7 @@ function scoreBarColor(score) {
             <div class="h-12 w-px bg-gray-200 hidden sm:block"></div>
             <div class="text-right hidden sm:block">
               <p class="text-xs text-gray-400 font-medium">Jours présents</p>
-              <p class="text-2xl font-bold text-gray-900 mt-0.5">{{ joursPresents }}<span class="text-sm font-normal text-gray-400">/30</span></p>
+              <p class="text-2xl font-bold text-gray-900 mt-0.5">{{ bilanAgent ? bilanAgent.taux_presence : (joursPresents / 20 * 100).toFixed(0) }}<span class="text-sm font-normal text-gray-400"> %</span></p>
             </div>
           </div>
         </div>
@@ -403,7 +403,7 @@ function scoreBarColor(score) {
             <div class="text-right">
               <p class="text-4xl font-bold tracking-tight">{{ fiche.prime.montant.toLocaleString('fr-FR') }} <span class="text-lg">XAF</span></p>
               <p v-if="!fiche.prime.eligible" class="text-sm opacity-80 mt-0.5">{{ fiche.prime.raison }}</p>
-              <p v-if="fiche.prorata" class="text-sm opacity-80 mt-0.5">Prorata présence ({{ fiche.joursPresent }}j/30)</p>
+              <p v-if="fiche.prorata" class="text-sm opacity-80 mt-0.5">Prorata presence ({{ fiche.tauxPresence || (fiche.joursPresent / 20 * 100).toFixed(0) }}%)</p>
             </div>
             <button
               @click="exporterPdfAgent"
@@ -453,7 +453,7 @@ function scoreBarColor(score) {
               QHSE: {{ fiche.penalites.qhse > 0 ? '-' + fiche.penalites.qhse.toLocaleString() + ' F' : '✓' }}
             </span>
             <span class="px-2 py-1 rounded bg-white/10">
-              Présence: {{ fiche.joursPresent || joursPresents }}j/30
+              Presence: {{ fiche.tauxPresence || (( fiche.joursPresent || joursPresents) / 20 * 100).toFixed(0) }}%
             </span>
           </div>
         </div>

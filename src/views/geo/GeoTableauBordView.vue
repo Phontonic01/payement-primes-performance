@@ -40,6 +40,9 @@ const synthese = computed(() => {
       dateFr: formatDateFr(b.date),
       agent: agent?.nom || b.agent,
       matricule: b.matricule,
+      immatriculation: tonnage?.immatriculation || '',
+      noParc: tonnage?.noParc || '',
+      vehiculeLabel: tonnage?.vehiculeLabel || tonnage?.vehicule || '—',
       circuit: b.circuit || '—',
       collecte: {
         declare: b.bouclageDeclare ? 'OUI' : 'NON',
@@ -229,8 +232,16 @@ function getCouvertureBg(pct) {
                 {{ item.agent.charAt(0) }}
               </div>
               <div>
-                <p class="text-sm font-semibold text-gray-900">{{ item.agent }} <span class="text-gray-400 font-normal">({{ item.matricule }})</span></p>
-                <p class="text-xs text-gray-500">{{ item.dateFr }} — {{ item.circuit }}</p>
+                <p class="text-sm font-semibold text-gray-900">
+                  {{ item.agent }}
+                  <span class="text-gray-400 font-normal">· Mat. {{ item.matricule }}</span>
+                </p>
+                <p class="text-xs text-gray-500">
+                  {{ item.dateFr }} — {{ item.circuit }}
+                  <span v-if="item.immatriculation" class="ml-2 text-blue-600 font-medium">
+                    Vehicule {{ item.immatriculation }} <span v-if="item.noParc">(N°{{ item.noParc }})</span>
+                  </span>
+                </p>
               </div>
             </div>
             <div class="flex items-center gap-2">
@@ -249,6 +260,7 @@ function getCouvertureBg(pct) {
               <div class="rounded-lg bg-emerald-50/50 border border-emerald-100 p-3">
                 <div class="flex items-center gap-1.5 mb-2"><Truck class="w-3.5 h-3.5 text-emerald-600" /><span class="text-xs font-semibold text-emerald-700 uppercase tracking-wider">Collecte</span></div>
                 <div class="space-y-1 text-sm">
+                  <div class="flex justify-between"><span class="text-gray-500">Vehicule</span><span class="font-mono font-medium text-blue-600">{{ item.immatriculation || '—' }} <span v-if="item.noParc" class="text-gray-400">(N°{{ item.noParc }})</span></span></div>
                   <div class="flex justify-between"><span class="text-gray-500">Bouclage</span><span class="font-semibold" :class="item.collecte.declare === 'OUI' ? 'text-emerald-600' : 'text-red-600'">{{ item.collecte.declare }}</span></div>
                   <div class="flex justify-between"><span class="text-gray-500">Tonnage</span><span class="font-medium text-gray-900">{{ item.collecte.tonnage }}</span></div>
                 </div>

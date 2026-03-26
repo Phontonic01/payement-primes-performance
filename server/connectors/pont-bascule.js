@@ -277,20 +277,33 @@ async function getBilanMensuel(mois, client = 'CLEAN AFRICA') {
   const [annee, m] = mois.split('-').map(Number)
   const p = await connectPontBascule()
 
-  // Toutes les pesées du mois pour ce client, avec l'heure pour déterminer l'équipe
+  const joursOuvres = 20
+
+  // Période de prime = du 21 du mois précédent au 20 du mois courant
+  // Ex: "mars 2026" = 21 février 2026 → 20 mars 2026
+  // Ex: "avril 2026" = 21 mars 2026 → 20 avril 2026
+  let moisPrec = m - 1
+  let anneePrec = annee
+  if (moisPrec === 0) { moisPrec = 12; anneePrec = annee - 1 }
+
   const result = await p.request()
-    .input('annee', sql.Int, annee)
-    .input('mois', sql.Int, m)
+    .input('anneePrec', sql.Int, anneePrec)
+    .input('moisPrec', sql.Int, moisPrec)
+    .input('anneeCour', sql.Int, annee)
+    .input('moisCour', sql.Int, m)
     .input('client', sql.NVarChar, client)
     .query(`
       SELECT Code_Transporteur, Libelle_Transporteur, Immatriculation,
-             Jour, Poids_Net, Libelle_Destination, Heure_Entree
+             Jour, Mois, Annee, Poids_Net, Libelle_Destination, Heure_Entree
       FROM VUE_CLEAN_AFRICA
-      WHERE Annee = @annee AND Mois = @mois AND Libelle_Client = @client
-      ORDER BY Code_Transporteur, Jour
+      WHERE Libelle_Client = @client
+        AND (
+          (Annee = @anneePrec AND Mois = @moisPrec AND Jour >= 21)
+          OR
+          (Annee = @anneeCour AND Mois = @moisCour AND Jour <= 20)
+        )
+      ORDER BY Code_Transporteur, Annee, Mois, Jour
     `)
-
-  const joursOuvres = 30
   const plafond = 50000
   const partTonnage = plafond * 0.50 // 25000 F pour l'axe tonnage
   const primeJourTonnage = partTonnage / joursOuvres // ~833 F/jour
@@ -378,12 +391,13 @@ async function getBilanMensuel(mois, client = 'CLEAN AFRICA') {
     // Prime avant prorata présence
     let primeAvant = Math.max(0, plafond - totalPenalites)
 
-    // Prorata si présence < 93%
-    const tauxPresence = +(joursPresent / joursOuvres * 100).toFixed(1)
+    // Présence plafonnée à joursOuvres (un agent ne peut pas avoir plus de 20j)
+    const joursEffectifs = Math.min(joursPresent, joursOuvres)
+    const tauxPresence = +(joursEffectifs / joursOuvres * 100).toFixed(1)
     let prorata = false
     let primeFinale = primeAvant
-    if (joursPresent < Math.ceil(joursOuvres * 0.93)) {
-      primeFinale = Math.round(primeAvant * (joursPresent / joursOuvres))
+    if (joursEffectifs < Math.ceil(joursOuvres * 0.93)) {
+      primeFinale = Math.round(primeAvant * (joursEffectifs / joursOuvres))
       prorata = true
     }
 
@@ -392,7 +406,8 @@ async function getBilanMensuel(mois, client = 'CLEAN AFRICA') {
       chauffeur: c.chauffeur,
       immatriculation: c.immatriculation,
       equipe: c.equipe,
-      jours_present: joursPresent,
+      jours_present: joursEffectifs,
+      jours_bruts: joursPresent,
       taux_presence: tauxPresence,
       penalites: {
         tonnage: penaliteTonnageCumulee,
@@ -409,7 +424,13 @@ async function getBilanMensuel(mois, client = 'CLEAN AFRICA') {
     }
   }).sort((a, b) => b.prime_finale - a.prime_finale)
 
-  return { mois, jours_ouvres: joursOuvres, plafond, chauffeurs: bilans }
+  return {
+    mois,
+    periode: `${anneePrec}-${String(moisPrec).padStart(2,'0')}-21 au ${annee}-${String(m).padStart(2,'0')}-20`,
+    jours_ouvres: joursOuvres,
+    plafond,
+    chauffeurs: bilans,
+  }
 }
 
 /**
@@ -419,17 +440,30 @@ async function getBilanMensuel(mois, client = 'CLEAN AFRICA') {
 async function getPresenceMensuelle(mois, client = 'CLEAN AFRICA') {
   const [annee, m] = mois.split('-').map(Number)
   const p = await connectPontBascule()
+
+  // Période de prime = 21 du mois précédent → 20 du mois courant
+  let moisPrec = m - 1
+  let anneePrec = annee
+  if (moisPrec === 0) { moisPrec = 12; anneePrec = annee - 1 }
+
   const result = await p.request()
-    .input('annee', sql.Int, annee)
-    .input('mois', sql.Int, m)
+    .input('anneePrec', sql.Int, anneePrec)
+    .input('moisPrec', sql.Int, moisPrec)
+    .input('anneeCour', sql.Int, annee)
+    .input('moisCour', sql.Int, m)
     .input('client', sql.NVarChar, client)
     .query(`
       SELECT
         Code_Transporteur,
         Libelle_Transporteur,
-        COUNT(DISTINCT Jour) AS jours_present
+        COUNT(DISTINCT CAST(CONCAT(Annee, '-', Mois, '-', Jour) AS VARCHAR)) AS jours_present
       FROM VUE_CLEAN_AFRICA
-      WHERE Annee = @annee AND Mois = @mois AND Libelle_Client = @client
+      WHERE Libelle_Client = @client
+        AND (
+          (Annee = @anneePrec AND Mois = @moisPrec AND Jour >= 21)
+          OR
+          (Annee = @anneeCour AND Mois = @moisCour AND Jour <= 20)
+        )
       GROUP BY Code_Transporteur, Libelle_Transporteur
       ORDER BY jours_present DESC
     `)

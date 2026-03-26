@@ -13,11 +13,10 @@ import { useConfirmStore } from '@/stores/confirm'
 
 const toastStore = useToastStore()
 const loading = ref(true)
-onMounted(() => { setTimeout(() => { loading.value = false }, 800) })
 const confirmStore = useConfirmStore()
 
 const agentFilter = ref('')
-const monthFilter = ref('2025-12')
+const monthFilter = ref(new Date().toISOString().slice(0, 7))
 
 const columns = [
   { key: 'date', label: 'Date' },
@@ -29,14 +28,55 @@ const columns = [
   { key: 'statut', label: 'Statut' },
 ]
 
-// Importer le store saisies pour lire les données réelles
 import { useSaisiesStore } from '@/stores/saisies'
 import { usePrimesStore } from '@/stores/primes'
+import { usePontBasculeStore } from '@/stores/pontBascule'
 import { formatDateFr } from '@/utils/formatDate'
+import api from '@/api/client'
 const saisiesStore = useSaisiesStore()
 const primesStore = usePrimesStore()
+const pontBasculeStore = usePontBasculeStore()
 
+// Charger le bilan pont-bascule et les saisies locales
+async function charger() {
+  loading.value = true
+  try {
+    await Promise.all([
+      pontBasculeStore.chargerBilan(monthFilter.value),
+      saisiesStore.chargerMois(monthFilter.value),
+    ])
+  } catch (e) { console.error(e) }
+  finally { loading.value = false }
+}
+onMounted(charger)
+watch(monthFilter, charger)
+
+// Combiner les données pont-bascule avec les saisies locales
 const historiques = computed(() => {
+  // Priorité : chauffeurs du pont-bascule
+  const chauffeurs = pontBasculeStore.chauffeurs
+  if (chauffeurs.length > 0) {
+    return chauffeurs.flatMap(c =>
+      (c.detail_jours || []).map((j, i) => {
+        const scoreTonnage = primesStore.calculerScoreTonnage('BOM', j.tonnage_tonnes, j.rotations)
+        return {
+          id: `${c.code_transporteur}-${j.jour}`,
+          date: formatDateFr(`${monthFilter.value}-${String(j.jour).padStart(2, '0')}`),
+          agent: c.chauffeur,
+          matricule: c.code_transporteur,
+          vehicule: c.immatriculation,
+          tonnageVal: j.tonnage_tonnes,
+          rotationsVal: j.rotations,
+          tonnage: `${j.tonnage_tonnes} t (${j.rotations} rot.)`,
+          score: scoreTonnage + '%',
+          penalite: j.penalite || 0,
+          bouclage: 'PONT_BASCULE',
+          statut: 'PONT_BASCULE',
+        }
+      })
+    )
+  }
+  // Fallback : saisies locales
   return saisiesStore.historiqueTonnages.map((t, i) => {
     const scoreTonnage = primesStore.calculerScoreTonnage(t.vehicule, t.tonnage, t.rotations)
     const bouclage = saisiesStore.getBouclage(t.matricule, t.date)
@@ -50,6 +90,7 @@ const historiques = computed(() => {
       rotationsVal: t.rotations,
       tonnage: `${t.tonnage} t (${t.rotations} rot.)`,
       score: scoreTonnage + '%',
+      penalite: 0,
       bouclage: bouclage?.statutGeo || 'NON_SAISI',
       statut: 'MODIFIABLE',
     }
