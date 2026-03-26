@@ -6,6 +6,7 @@ import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import { useToastStore } from '@/stores/toast'
 import { usePrimesStore } from '@/stores/primes'
+import api from '@/api/client'
 
 const toastStore = useToastStore()
 const primesStore = usePrimesStore()
@@ -21,7 +22,7 @@ const form = ref({
 })
 
 // Calcul en temps réel de la prime selon le barème
-const simulationPrime = computed(() => {
+const calculPrime = computed(() => {
   if (form.value.typeEquipement === 'BOM_CANTER') {
     return primesStore.calculerPrimeTri('BOM_CANTER', Number(form.value.tonnageCollecte))
   } else {
@@ -29,24 +30,42 @@ const simulationPrime = computed(() => {
   }
 })
 
-function validerSaisie() {
+const saving = ref(false)
+
+async function validerSaisie() {
   if (!form.value.arrondissement) {
     toastStore.addToast('Veuillez sélectionner l\'arrondissement / zone.', 'warning')
     return
   }
 
-  const valeur = form.value.typeEquipement === 'BOM_CANTER'
-    ? `${form.value.tonnageCollecte}t`
-    : `${form.value.bennesLevees} bennes`
+  saving.value = true
+  try {
+    await api.createTriSaisie({
+      date: form.value.date,
+      arrondissement: form.value.arrondissement,
+      type_equipement: form.value.typeEquipement,
+      tonnage_collecte: form.value.typeEquipement === 'BOM_CANTER' ? form.value.tonnageCollecte : 0,
+      bennes_levees: form.value.typeEquipement === 'MOVI' ? form.value.bennesLevees : 0,
+      pourcentage_prime: calculPrime.value.pourcentage,
+      montant_prime: calculPrime.value.montant,
+    })
 
-  toastStore.addToast(
-    `Saisie enregistrée — ${form.value.arrondissement} : ${valeur} → ${simulationPrime.value.pourcentage}% de la prime (${simulationPrime.value.montant.toLocaleString('fr-FR')} XAF).`,
-    simulationPrime.value.eligible ? 'success' : 'warning'
-  )
+    const valeur = form.value.typeEquipement === 'BOM_CANTER'
+      ? `${form.value.tonnageCollecte}t`
+      : `${form.value.bennesLevees} bennes`
 
-  // Reset valeurs
-  form.value.tonnageCollecte = 0
-  form.value.bennesLevees = 0
+    toastStore.addToast(
+      `Saisie enregistrée — ${form.value.arrondissement} : ${valeur} → ${calculPrime.value.pourcentage}% de la prime (${calculPrime.value.montant.toLocaleString('fr-FR')} XAF).`,
+      calculPrime.value.eligible ? 'success' : 'warning'
+    )
+
+    form.value.tonnageCollecte = 0
+    form.value.bennesLevees = 0
+  } catch (err) {
+    toastStore.addToast('Erreur : ' + err.message, 'error')
+  } finally {
+    saving.value = false
+  }
 }
 
 function primeColor(pct) {
@@ -204,21 +223,21 @@ function primeBg(pct) {
           </template>
         </div>
 
-        <!-- Simulation prime en temps réel -->
-        <div class="rounded-xl border p-5 transition-all" :class="primeBg(simulationPrime.pourcentage)">
+        <!-- Calcul prime en temps réel -->
+        <div class="rounded-xl border p-5 transition-all" :class="primeBg(calculPrime.pourcentage)">
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Estimation prime équipe</p>
-              <p class="text-sm text-gray-600 mt-0.5">{{ simulationPrime.palier }}</p>
+              <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Prime calculée pour l'équipe</p>
+              <p class="text-sm text-gray-600 mt-0.5">{{ calculPrime.palier }}</p>
             </div>
             <div class="text-right">
-              <p class="text-3xl font-bold" :class="primeColor(simulationPrime.pourcentage)">
-                {{ simulationPrime.pourcentage }}%
+              <p class="text-3xl font-bold" :class="primeColor(calculPrime.pourcentage)">
+                {{ calculPrime.pourcentage }}%
               </p>
               <p class="text-sm font-semibold text-gray-700">
-                {{ simulationPrime.montant.toLocaleString('fr-FR') }} <span class="text-xs font-normal text-gray-400">XAF</span>
+                {{ calculPrime.montant.toLocaleString('fr-FR') }} <span class="text-xs font-normal text-gray-400">XAF</span>
               </p>
-              <p class="text-[10px] text-gray-400 mt-0.5">Plafond : {{ simulationPrime.plafond.toLocaleString('fr-FR') }} XAF</p>
+              <p class="text-[10px] text-gray-400 mt-0.5">Plafond : {{ calculPrime.plafond.toLocaleString('fr-FR') }} XAF</p>
             </div>
           </div>
         </div>

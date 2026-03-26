@@ -1,35 +1,58 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { History, Recycle } from 'lucide-vue-next'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseTable from '@/components/ui/BaseTable.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import AgentSearchInput from '@/components/ui/AgentSearchInput.vue'
 import TableSkeleton from '@/components/ui/TableSkeleton.vue'
+import api from '@/api/client'
 
 const loading = ref(true)
-onMounted(() => { setTimeout(() => { loading.value = false }, 500) })
-
+const moisFiltre = ref(new Date().toISOString().slice(0, 7))
 const agentFilter = ref('')
+const rawData = ref([])
+
+async function charger() {
+  loading.value = true
+  try {
+    rawData.value = await api.getTriSaisies({ mois: moisFiltre.value })
+  } catch (err) {
+    console.error('Erreur chargement TRI:', err.message)
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(charger)
+watch(moisFiltre, charger)
+
+function formatDate(iso) {
+  if (!iso) return ''
+  const [y, m, d] = iso.split('-')
+  return `${d}/${m}/${y}`
+}
 
 const columns = [
   { key: 'dateFr', label: 'Date' },
-  { key: 'agent', label: 'Agent' },
-  { key: 'circuit', label: 'Zone / Circuit' },
-  { key: 'plastique', label: 'Plastiques (kg)' },
-  { key: 'carton', label: 'Cartons (kg)' },
-  { key: 'autre', label: 'Autres (kg)' },
-  { key: 'total', label: 'Total (kg)' },
-  { key: 'etat', label: 'État' },
+  { key: 'arrondissement', label: 'Zone' },
+  { key: 'type_equipement', label: 'Équipement' },
+  { key: 'valeur', label: 'Valeur' },
+  { key: 'pourcentageFr', label: '% Prime' },
+  { key: 'montantFr', label: 'Montant' },
 ]
 
-// Placeholder — les données seront alimentées depuis le store saisies
-const historiques = computed(() => [])
+const historiques = computed(() =>
+  rawData.value.map(r => ({
+    ...r,
+    dateFr: formatDate(r.date),
+    valeur: r.type_equipement === 'BOM_CANTER' ? r.tonnage_collecte + ' t' : r.bennes_levees + ' bennes',
+    pourcentageFr: r.pourcentage_prime + '%',
+    montantFr: (r.montant_prime || 0).toLocaleString() + ' F',
+  }))
+)
 
-const filteredHistoriques = computed(() => {
-  if (!agentFilter.value) return historiques.value
-  return historiques.value.filter(h => h.matricule === agentFilter.value)
-})
+const filteredHistoriques = computed(() => historiques.value)
 </script>
 
 <template>

@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import router from '@/router'
 import api from '@/api/client'
+import { useAgentsStore } from '@/stores/agents'
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref(JSON.parse(localStorage.getItem('user')) || null)
@@ -21,6 +22,10 @@ export const useAuthStore = defineStore('auth', () => {
 
       localStorage.setItem('user', JSON.stringify(data.user))
       localStorage.setItem('token', data.token)
+
+      // Charger les agents après connexion réussie
+      const agentsStore = useAgentsStore()
+      agentsStore.fetchAgents()
 
       return { success: true }
     } catch (err) {
@@ -44,12 +49,13 @@ export const useAuthStore = defineStore('auth', () => {
 
   function hasRole(allowedRoles) {
     if (!user.value) return false
-    if (user.value.role === 'DAF') return true
+    if (user.value.role === 'ADMIN' || user.value.role === 'DAF') return true
     return allowedRoles.includes(user.value.role)
   }
 
   function isReadOnly() {
     if (!user.value) return true
+    if (user.value.role === 'ADMIN') return false
     return user.value.role === 'DAF'
   }
 

@@ -8,11 +8,17 @@ import {
 } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 import { useThemeStore } from '@/stores/theme'
+import { useAgentsStore } from '@/stores/agents'
+import { usePontBasculeStore } from '@/stores/pontBascule'
 import { ref, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
 const authStore = useAuthStore()
 const themeStore = useThemeStore()
+const agentsStore = useAgentsStore()
+const pontBasculeStore = usePontBasculeStore()
+agentsStore.ensureLoaded()
+pontBasculeStore.chargerBilan()
 const route = useRoute()
 const sidebarOpen = ref(true)
 const sidebarMobileOpen = ref(false)

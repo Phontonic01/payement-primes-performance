@@ -144,8 +144,8 @@ const colorMap = {
 
         <!-- Title -->
         <h1 class="text-center text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-[1.1] tracking-tight">
-          <span class="text-white">Gestion de la Prime</span><br/>
-          <span class="bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-300 bg-clip-text text-transparent">de Performance</span>
+          <span class="text-white">Gestion de la Prime de Performance</span><br/>
+          <span class="bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-300 bg-clip-text text-transparent">de la Collecte</span>
         </h1>
         <p class="text-center text-white/40 text-lg sm:text-xl max-w-2xl mx-auto mt-6 leading-relaxed">
           Évaluez, suivez et récompensez la performance de vos équipes de collecte avec transparence et précision.

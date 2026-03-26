@@ -247,8 +247,10 @@ function seedUsers(bcrypt) {
   if (count > 0) return
 
   const hash = bcrypt.hashSync('cleanAfrica2026', 10)
+  const hashAdmin = bcrypt.hashSync('admin', 10)
   const insert = db.prepare('INSERT INTO users (username, password_hash, role, nom) VALUES (?, ?, ?, ?)')
   const users = [
+    ['admin', hashAdmin, 'ADMIN', 'Administrateur'],
     ['daf', hash, 'DAF', 'Direction Administrative et Financière'],
     ['collecte', hash, 'COLLECTE', 'Service Collecte'],
     ['geo', hash, 'GEO', 'Service Géolocalisation'],

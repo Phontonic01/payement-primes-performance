@@ -1,15 +1,19 @@
 <script setup>
-import { ref, computed } from 'vue'
-import { Search, Calendar, User, Hash, MapPin, Truck, ShieldCheck, Wrench, TrendingUp, CheckCircle, XCircle, Clock, AlertTriangle, ArrowDown, Download } from 'lucide-vue-next'
+import { ref, computed, watch } from 'vue'
+import { Search, Calendar, User, Hash, MapPin, Truck, ShieldCheck, Wrench, TrendingUp, CheckCircle, XCircle, Clock, AlertTriangle, ArrowDown, Download, Zap } from 'lucide-vue-next'
 import { generateFicheAgentPdf } from '@/utils/generatePdf'
 import { formatDateFr } from '@/utils/formatDate'
 import { useAgentsStore } from '@/stores/agents'
 import { usePrimesStore } from '@/stores/primes'
+import { usePontBasculeStore } from '@/stores/pontBascule'
+import { useSaisiesStore } from '@/stores/saisies'
 import AgentSearchInput from '@/components/ui/AgentSearchInput.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 
 const agentsStore = useAgentsStore()
 const primesStore = usePrimesStore()
+const pontBasculeStore = usePontBasculeStore()
+const saisiesStore = useSaisiesStore()
 
 const selectedMatricule = ref('')
 const selectedDate = ref(new Date().toISOString().split('T')[0])
@@ -19,43 +23,81 @@ function onAgentSelected(agent) {
   selectedAgent.value = agent
 }
 
-const isPresent = computed(() => {
-  if (!selectedAgent.value || !selectedDate.value) return null
-  return agentsStore.isPresent(selectedAgent.value.matricule, selectedDate.value)
-})
-
-// Jours de présence dans le mois
-const joursPresents = computed(() => {
-  if (!selectedAgent.value) return 0
-  return Object.entries(agentsStore.presences).filter(
-    ([, matricules]) => matricules.includes(selectedAgent.value.matricule)
-  ).length
-})
-
-import { useSaisiesStore } from '@/stores/saisies'
-const saisiesStore = useSaisiesStore()
-
 // Mois sélectionné
 const moisSelectionne = computed(() => {
   if (!selectedDate.value) return ''
-  return selectedDate.value.substring(0, 7) // "YYYY-MM"
+  return selectedDate.value.substring(0, 7)
 })
 
-// Calcul complet via le moteur de primes + store saisies
+// Charger le bilan quand le mois change
+watch(moisSelectionne, (mois) => {
+  if (mois) pontBasculeStore.chargerBilan(mois)
+}, { immediate: true })
+
+// Bilan pont-bascule pour l'agent sélectionné (par nom)
+const bilanAgent = computed(() => {
+  if (!selectedAgent.value) return null
+  return pontBasculeStore.getBilanParNom(selectedAgent.value.nom)
+})
+
+// Présence depuis le pont-bascule (automatique)
+const joursPresents = computed(() => bilanAgent.value?.jours_present || 0)
+
+const isPresent = computed(() => {
+  if (!bilanAgent.value) return null
+  return bilanAgent.value.jours_present > 0
+})
+
+// Fiche avec données pont-bascule (pénalités cumulées jour par jour)
 const fiche = computed(() => {
-  if (!selectedAgent.value || !moisSelectionne.value) return null
+  if (!selectedAgent.value) return null
 
+  // Priorité 1 : bilan pont-bascule (données réelles jour par jour)
+  if (bilanAgent.value) {
+    const b = bilanAgent.value
+    const plafond = b.plafond
+    const scoreGlobal = plafond > 0 ? (b.prime_finale / plafond) * 100 : 0
+
+    return {
+      source: 'pont-bascule',
+      scores: {
+        tonnage: plafond > 0 ? ((plafond - b.penalites.tonnage) / (plafond * 0.5)) * 100 : 100,
+        bouclage: 100 - (b.penalites.bouclage > 0 ? (b.penalites.bouclage / (plafond * 0.25)) * 100 : 0),
+        entretien: 100 - (b.penalites.entretien > 0 ? (b.penalites.entretien / (plafond * 0.15)) * 100 : 0),
+        qhse: 100 - (b.penalites.qhse > 0 ? (b.penalites.qhse / (plafond * 0.10)) * 100 : 0),
+      },
+      scoreGlobal,
+      penalites: b.penalites,
+      prime: {
+        montant: b.prime_finale,
+        eligible: b.prime_finale > 0,
+        raison: b.prime_finale === 0 ? 'Score global sous le seuil minimum' : null,
+      },
+      ponderations: { tonnage: 50, bouclage: 25, entretien: 15, qhse: 10 },
+      details: {
+        tonnagePondere: ((100 - (b.penalites.tonnage / (plafond * 0.5) * 100)) * 0.5).toFixed(1),
+        bouclagePondere: (25).toFixed(1), // pas encore de données
+        entretienPondere: (15).toFixed(1),
+        qhsePondere: (10).toFixed(1),
+      },
+      plafond,
+      joursPresent: b.jours_present,
+      tauxPresence: b.taux_presence,
+      equipe: b.equipe,
+      prorata: b.prorata,
+      detailJours: b.detail_jours || [],
+    }
+  }
+
+  // Priorité 2 : ancien calcul via saisies locales (fallback)
   const agregation = saisiesStore.getAgregationMensuelle(selectedAgent.value.matricule, moisSelectionne.value)
-
-  // Si aucune saisie n'existe, pas de fiche
   if (agregation.nbSaisiesTonnage === 0 && agregation.nbSaisiesBouclage === 0 &&
       agregation.nbSaisiesEntretien === 0 && agregation.nbSaisiesQhse === 0) {
     return null
   }
 
   const typeAgent = selectedAgent.value.role === 'EQUIPIER' ? 'RIPEUR_COLLECTE' : 'CHAUFFEUR_COLLECTE'
-
-  return primesStore.calculerFicheAgent({
+  const result = primesStore.calculerFicheAgent({
     typeVehicule: agregation.typeVehicule,
     typeAgent,
     joursPresents: joursPresents.value || 28,
@@ -65,12 +107,24 @@ const fiche = computed(() => {
     noteEntretienMoyenne: agregation.noteEntretienMoyenne,
     qhseData: agregation.qhseData,
   })
+  return { ...result, source: 'local' }
 })
 
 const evalData = computed(() => {
-  if (!selectedAgent.value || !moisSelectionne.value) return null
+  if (!fiche.value) return null
+  if (fiche.value.source === 'pont-bascule' && bilanAgent.value) {
+    const b = bilanAgent.value
+    return {
+      typeVehicule: 'BOM',
+      typeAgent: selectedAgent.value?.role === 'EQUIPIER' ? 'RIPEUR_COLLECTE' : 'CHAUFFEUR_COLLECTE',
+      tonnage: b.detail_jours?.length > 0 ? b.detail_jours.reduce((s, j) => s + j.tonnage_tonnes, 0) / b.detail_jours.length : 0,
+      rotations: b.detail_jours?.length > 0 ? b.detail_jours.reduce((s, j) => s + j.rotations, 0) / b.detail_jours.length : 0,
+      bouclages: [],
+      noteEntretien: null,
+      qhse: { checklistSur5: 5, alcootestPositif: false, epiConforme: true, quartHeureSecurite: true },
+    }
+  }
   const agregation = saisiesStore.getAgregationMensuelle(selectedAgent.value.matricule, moisSelectionne.value)
-  if (agregation.nbSaisiesTonnage === 0) return null
   return {
     typeVehicule: agregation.typeVehicule,
     typeAgent: selectedAgent.value.role === 'EQUIPIER' ? 'RIPEUR_COLLECTE' : 'CHAUFFEUR_COLLECTE',
@@ -329,7 +383,7 @@ function scoreBarColor(score) {
         </div>
       </div>
 
-      <!-- Prime finale -->
+      <!-- Prime finale — dégression par pénalités -->
       <div
         class="rounded-xl p-6 text-white"
         :class="fiche.prime.eligible ? 'bg-gradient-to-r from-emerald-600 to-emerald-700' : 'bg-gradient-to-r from-gray-500 to-gray-600'"
@@ -338,10 +392,10 @@ function scoreBarColor(score) {
           <div class="flex items-center gap-3">
             <TrendingUp class="w-6 h-6 opacity-60" />
             <div>
-              <h3 class="text-lg font-bold">Prime de Performance</h3>
+              <h3 class="text-lg font-bold">Prime de Performance — Reste à payer</h3>
               <p class="text-sm opacity-80">
-                {{ selectedAgent.nom }} ({{ selectedAgent.matricule }}) — Plafond:
-                {{ (primesStore.config.plafonds[evalData?.typeAgent] || 50000).toLocaleString('fr-FR') }} XAF
+                {{ selectedAgent.nom }} ({{ selectedAgent.matricule }})
+                <span v-if="fiche.equipe" class="ml-1 opacity-70">· {{ fiche.equipe === 'NUIT' ? '🌙 Nuit' : '☀️ Jour' }}</span>
               </p>
             </div>
           </div>
@@ -349,14 +403,58 @@ function scoreBarColor(score) {
             <div class="text-right">
               <p class="text-4xl font-bold tracking-tight">{{ fiche.prime.montant.toLocaleString('fr-FR') }} <span class="text-lg">XAF</span></p>
               <p v-if="!fiche.prime.eligible" class="text-sm opacity-80 mt-0.5">{{ fiche.prime.raison }}</p>
+              <p v-if="fiche.prorata" class="text-sm opacity-80 mt-0.5">Prorata présence ({{ fiche.joursPresent }}j/30)</p>
             </div>
             <button
               @click="exporterPdfAgent"
-              class="flex-shrink-0 w-10 h-10 rounded-xl bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
+              class="flex-shrink-0 w-10 h-10 rounded-xl bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors cursor-pointer"
               title="Exporter PDF"
             >
               <Download class="w-5 h-5 text-white" />
             </button>
+          </div>
+        </div>
+
+        <!-- Détail dégression -->
+        <div v-if="fiche.penalites" class="mt-4 pt-4 border-t border-white/20">
+          <div class="flex flex-wrap gap-4 text-sm">
+            <div>
+              <p class="text-xs opacity-60">Plafond</p>
+              <p class="font-bold font-mono">{{ (fiche.plafond || 50000).toLocaleString() }} F</p>
+            </div>
+            <div class="text-center">
+              <p class="text-xs opacity-60">−</p>
+              <p class="text-lg opacity-60">−</p>
+            </div>
+            <div>
+              <p class="text-xs opacity-60">Pénalités cumulées</p>
+              <p class="font-bold font-mono text-red-200">{{ fiche.penalites.total.toLocaleString() }} F</p>
+            </div>
+            <div class="text-center">
+              <p class="text-xs opacity-60">=</p>
+              <p class="text-lg opacity-60">=</p>
+            </div>
+            <div>
+              <p class="text-xs opacity-60">Reste à payer</p>
+              <p class="font-bold font-mono text-lg">{{ fiche.prime.montant.toLocaleString() }} F</p>
+            </div>
+          </div>
+          <div class="flex flex-wrap gap-3 mt-3 text-xs">
+            <span class="px-2 py-1 rounded bg-white/10" :class="fiche.penalites.tonnage > 0 ? 'text-red-200' : 'text-emerald-200'">
+              Tonnage: {{ fiche.penalites.tonnage > 0 ? '-' + fiche.penalites.tonnage.toLocaleString() + ' F' : '✓' }}
+            </span>
+            <span class="px-2 py-1 rounded bg-white/10" :class="fiche.penalites.bouclage > 0 ? 'text-red-200' : 'text-emerald-200'">
+              Bouclage: {{ fiche.penalites.bouclage > 0 ? '-' + fiche.penalites.bouclage.toLocaleString() + ' F' : '✓' }}
+            </span>
+            <span class="px-2 py-1 rounded bg-white/10" :class="fiche.penalites.entretien > 0 ? 'text-red-200' : 'text-emerald-200'">
+              Entretien: {{ fiche.penalites.entretien > 0 ? '-' + fiche.penalites.entretien.toLocaleString() + ' F' : '✓' }}
+            </span>
+            <span class="px-2 py-1 rounded bg-white/10" :class="fiche.penalites.qhse > 0 ? 'text-red-200' : 'text-emerald-200'">
+              QHSE: {{ fiche.penalites.qhse > 0 ? '-' + fiche.penalites.qhse.toLocaleString() + ' F' : '✓' }}
+            </span>
+            <span class="px-2 py-1 rounded bg-white/10">
+              Présence: {{ fiche.joursPresent || joursPresents }}j/30
+            </span>
           </div>
         </div>
       </div>

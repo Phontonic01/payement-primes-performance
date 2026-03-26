@@ -15,6 +15,7 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue', 'agent-selected'])
 
 const agentsStore = useAgentsStore()
+agentsStore.ensureLoaded()
 const query = ref('')
 const isOpen = ref(false)
 const selectedAgent = ref(null)

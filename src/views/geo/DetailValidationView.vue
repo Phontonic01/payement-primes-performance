@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
-import { ArrowLeft, MapPin, CheckCircle, AlertTriangle, XCircle, Truck, Wrench, ShieldCheck, Navigation, Clock, Gauge } from 'lucide-vue-next'
+import { ArrowLeft, MapPin, CheckCircle, AlertTriangle, XCircle, Truck, Wrench, ShieldCheck, Navigation, Clock, Gauge, Upload, Image, Trash2 } from 'lucide-vue-next'
 import { useToastStore } from '@/stores/toast'
 import { useConfirmStore } from '@/stores/confirm'
 import { useGeoStore } from '@/stores/geo'
@@ -25,6 +25,44 @@ const rawId = route.params.id
 const [matricule, dateIso] = rawId.split('__')
 
 const justification = ref('')
+const circuitImage = ref(null)
+const circuitImageUrl = ref('')
+const isDragging = ref(false)
+
+function onDragOver(e) {
+  e.preventDefault()
+  isDragging.value = true
+}
+
+function onDragLeave() {
+  isDragging.value = false
+}
+
+function onDrop(e) {
+  e.preventDefault()
+  isDragging.value = false
+  const file = e.dataTransfer?.files?.[0]
+  if (file && file.type.startsWith('image/')) {
+    circuitImage.value = file
+    circuitImageUrl.value = URL.createObjectURL(file)
+  }
+}
+
+function onFileSelect(e) {
+  const file = e.target?.files?.[0]
+  if (file && file.type.startsWith('image/')) {
+    circuitImage.value = file
+    circuitImageUrl.value = URL.createObjectURL(file)
+  }
+}
+
+function supprimerImage() {
+  circuitImage.value = null
+  if (circuitImageUrl.value) {
+    URL.revokeObjectURL(circuitImageUrl.value)
+    circuitImageUrl.value = ''
+  }
+}
 
 // Formater date ISO en dd/mm/yyyy
 function formatDate(iso) {
@@ -42,16 +80,16 @@ const qhseData = computed(() => saisiesStore.getQhse(matricule, dateIso))
 
 const notFound = computed(() => !agent.value || !bouclage.value)
 
-// Données GPS simulées (en phase test, pas de vraie intégration GPS)
+// Données GPS — à renseigner manuellement par l'opérateur GEO
 const gps = ref({
-  couverture: Math.floor(Math.random() * 30) + 70, // 70-100% simulé
-  kmParcourus: (Math.random() * 30 + 20).toFixed(1),
-  tempsCircuit: `${Math.floor(Math.random() * 3) + 4}h${String(Math.floor(Math.random() * 60)).padStart(2, '0')}`,
-  arrets: Math.floor(Math.random() * 6) + 1,
-  vitesseMoyenne: Math.floor(Math.random() * 15) + 20,
-  heureDepart: '06:15',
-  heureRetour: '11:30',
-  pointsGps: Math.floor(Math.random() * 800) + 600,
+  couverture: 0,
+  kmParcourus: '',
+  tempsCircuit: '',
+  arrets: 0,
+  vitesseMoyenne: 0,
+  heureDepart: '',
+  heureRetour: '',
+  pointsGps: 0,
 })
 
 async function valider(statut) {
@@ -244,94 +282,119 @@ async function valider(statut) {
 
         <!-- Colonne droite: métriques GPS -->
         <div class="lg:col-span-2 space-y-4">
-          <!-- Métriques GPS -->
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div class="bg-white rounded-xl border border-gray-100 p-4 text-center">
-              <Navigation class="w-5 h-5 text-blue-500 mx-auto mb-2" />
-              <p class="text-xl font-bold" :class="gps.couverture >= 90 ? 'text-emerald-600' : (gps.couverture >= 70 ? 'text-amber-600' : 'text-red-600')">
-                {{ gps.couverture }}%
-              </p>
-              <p class="text-xs text-gray-500 mt-0.5">Couverture</p>
-            </div>
-            <div class="bg-white rounded-xl border border-gray-100 p-4 text-center">
-              <MapPin class="w-5 h-5 text-blue-500 mx-auto mb-2" />
-              <p class="text-xl font-bold text-gray-900">{{ gps.kmParcourus }} km</p>
-              <p class="text-xs text-gray-500 mt-0.5">Parcourus</p>
-            </div>
-            <div class="bg-white rounded-xl border border-gray-100 p-4 text-center">
-              <Clock class="w-5 h-5 text-blue-500 mx-auto mb-2" />
-              <p class="text-xl font-bold text-gray-900">{{ gps.tempsCircuit }}</p>
-              <p class="text-xs text-gray-500 mt-0.5">Durée circuit</p>
-            </div>
-            <div class="bg-white rounded-xl border border-gray-100 p-4 text-center">
-              <Gauge class="w-5 h-5 text-blue-500 mx-auto mb-2" />
-              <p class="text-xl font-bold text-gray-900">{{ gps.vitesseMoyenne }} km/h</p>
-              <p class="text-xs text-gray-500 mt-0.5">Vitesse moy.</p>
-            </div>
-          </div>
-
-          <!-- Détails GPS -->
+          <!-- Saisie données GPS terrain -->
           <BaseCard>
             <template #header>
-              <h3 class="text-sm font-semibold text-gray-900">Détails du trajet GPS</h3>
+              <h3 class="text-sm font-semibold text-gray-900">Données terrain GPS</h3>
             </template>
-            <div class="grid grid-cols-2 gap-4 text-sm mb-4">
-              <div class="flex justify-between">
-                <span class="text-gray-500">Heure départ</span>
-                <span class="font-medium text-gray-900">{{ gps.heureDepart }}</span>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div class="space-y-1">
+                <label class="text-xs font-medium text-gray-500">Couverture circuit (%)</label>
+                <input v-model.number="gps.couverture" type="number" min="0" max="100" placeholder="Ex: 85"
+                  class="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 font-mono font-bold text-center focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none"
+                  :class="gps.couverture >= 90 ? 'text-emerald-600' : gps.couverture >= 70 ? 'text-amber-600' : 'text-gray-900'"
+                />
               </div>
-              <div class="flex justify-between">
-                <span class="text-gray-500">Heure retour</span>
-                <span class="font-medium text-gray-900">{{ gps.heureRetour }}</span>
+              <div class="space-y-1">
+                <label class="text-xs font-medium text-gray-500">Km parcourus</label>
+                <input v-model="gps.kmParcourus" type="text" placeholder="Ex: 32.5"
+                  class="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none"
+                />
               </div>
-              <div class="flex justify-between">
-                <span class="text-gray-500">Points GPS</span>
-                <span class="font-medium text-gray-900">{{ gps.pointsGps.toLocaleString('fr-FR') }}</span>
+              <div class="space-y-1">
+                <label class="text-xs font-medium text-gray-500">Heure départ</label>
+                <input v-model="gps.heureDepart" type="time"
+                  class="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none"
+                />
               </div>
-              <div class="flex justify-between">
-                <span class="text-gray-500">Arrêts détectés</span>
-                <span class="font-medium" :class="gps.arrets > 5 ? 'text-amber-600' : 'text-gray-900'">{{ gps.arrets }}</span>
+              <div class="space-y-1">
+                <label class="text-xs font-medium text-gray-500">Heure retour</label>
+                <input v-model="gps.heureRetour" type="time"
+                  class="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none"
+                />
               </div>
             </div>
 
             <!-- Barre couverture -->
-            <div class="mb-2">
+            <div v-if="gps.couverture > 0" class="mt-4">
               <div class="flex justify-between text-xs text-gray-500 mb-1">
                 <span>Couverture du circuit assigné</span>
-                <span class="font-bold" :class="gps.couverture >= 90 ? 'text-emerald-600' : (gps.couverture >= 70 ? 'text-amber-600' : 'text-red-600')">
+                <span class="font-bold" :class="gps.couverture >= 90 ? 'text-emerald-600' : gps.couverture >= 70 ? 'text-amber-600' : 'text-red-600'">
                   {{ gps.couverture }}%
                 </span>
               </div>
               <div class="w-full bg-gray-100 rounded-full h-3">
                 <div
                   class="h-3 rounded-full transition-all duration-500"
-                  :class="gps.couverture >= 90 ? 'bg-emerald-500' : (gps.couverture >= 70 ? 'bg-amber-500' : 'bg-red-500')"
+                  :class="gps.couverture >= 90 ? 'bg-emerald-500' : gps.couverture >= 70 ? 'bg-amber-500' : 'bg-red-500'"
                   :style="{ width: gps.couverture + '%' }"
                 ></div>
               </div>
             </div>
           </BaseCard>
 
-          <!-- Carte GPS simulée -->
+          <!-- Carte du circuit — Glisser-déposer -->
           <BaseCard class="h-full flex flex-col">
             <template #header>
-              <h3 class="text-sm font-semibold text-gray-900">Trace GPS du véhicule</h3>
+              <div class="flex items-center justify-between">
+                <h3 class="text-sm font-semibold text-gray-900">Carte du circuit (capture d'écran)</h3>
+                <span v-if="circuitImage" class="text-[10px] text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full font-medium">Image chargée</span>
+              </div>
             </template>
-            <div class="flex-1 bg-gray-50 flex items-center justify-center min-h-[300px] rounded-b-xl relative overflow-hidden">
-              <div class="absolute inset-0 opacity-10" style="background-image: radial-gradient(#3b82f6 1px, transparent 1px); background-size: 20px 20px;"></div>
-              <div class="text-center z-10">
-                <div class="inline-flex items-center justify-center w-14 h-14 rounded-xl bg-white shadow-sm border border-gray-100 mb-4">
-                  <MapPin class="w-7 h-7 text-blue-600" />
+
+            <!-- Image déjà chargée -->
+            <div v-if="circuitImageUrl" class="relative">
+              <img :src="circuitImageUrl" alt="Carte du circuit" class="w-full rounded-lg border border-gray-200" />
+              <button
+                type="button"
+                @click="supprimerImage"
+                class="absolute top-3 right-3 flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white text-xs font-medium rounded-lg shadow-lg hover:bg-red-700 transition-colors cursor-pointer"
+              >
+                <Trash2 class="w-3.5 h-3.5" />
+                Supprimer
+              </button>
+              <div class="mt-3 flex items-center gap-2 text-xs text-gray-500">
+                <Image class="w-3.5 h-3.5" />
+                {{ circuitImage.name }} — {{ (circuitImage.size / 1024).toFixed(0) }} Ko
+              </div>
+            </div>
+
+            <!-- Zone de glisser-déposer -->
+            <div
+              v-else
+              class="flex-1 min-h-[300px] rounded-xl border-2 border-dashed transition-all duration-200 flex flex-col items-center justify-center cursor-pointer"
+              :class="isDragging
+                ? 'border-blue-500 bg-blue-50'
+                : 'border-gray-300 bg-gray-50 hover:border-blue-400 hover:bg-blue-50/50'"
+              @dragover="onDragOver"
+              @dragleave="onDragLeave"
+              @drop="onDrop"
+              @click="$refs.fileInput.click()"
+            >
+              <input
+                ref="fileInput"
+                type="file"
+                accept="image/*"
+                class="hidden"
+                @change="onFileSelect"
+              />
+              <div class="text-center px-6">
+                <div
+                  class="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4 transition-colors"
+                  :class="isDragging ? 'bg-blue-100' : 'bg-white border border-gray-200 shadow-sm'"
+                >
+                  <Upload class="w-8 h-8" :class="isDragging ? 'text-blue-600' : 'text-gray-400'" />
                 </div>
-                <p class="text-gray-900 font-medium">Visualisation géographique simulée</p>
-                <p class="text-sm text-gray-500 mt-2">
-                  La trace GPS correspond à
-                  <span class="font-semibold" :class="gps.couverture >= 90 ? 'text-emerald-600' : (gps.couverture >= 70 ? 'text-amber-600' : 'text-red-600')">
-                    {{ gps.couverture }}%
-                  </span>
-                  du circuit prévu.
+                <p class="text-sm font-semibold" :class="isDragging ? 'text-blue-700' : 'text-gray-700'">
+                  {{ isDragging ? 'Relâchez pour déposer' : 'Glissez-déposez la carte du circuit ici' }}
                 </p>
-                <p class="text-xs text-gray-400 mt-3">{{ gps.pointsGps }} points GPS · {{ gps.kmParcourus }} km · {{ gps.arrets }} arrêts</p>
+                <p class="text-xs text-gray-400 mt-1.5">
+                  Capture d'écran GPS montrant le circuit bouclé ou non bouclé
+                </p>
+                <p class="text-xs text-gray-400 mt-1">
+                  ou <span class="text-blue-600 font-medium">cliquez pour parcourir</span>
+                </p>
+                <p class="text-[10px] text-gray-300 mt-3">PNG, JPG, WEBP — max 10 Mo</p>
               </div>
             </div>
           </BaseCard>

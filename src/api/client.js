@@ -118,6 +118,27 @@ export const api = {
   getValidations: () => request('/config/validations'),
   cloturerMois: (data) => request('/config/validations', { method: 'POST', body: JSON.stringify(data) }),
 
+  // ═══ Pont-Bascule ═══
+  pontBasculeStatus: () => request('/pont-bascule/status'),
+  pontBasculeDiagnostic: () => request('/pont-bascule/diagnostic'),
+  pontBasculeConnect: () => request('/pont-bascule/connect', { method: 'POST' }),
+  pontBasculePesees: (params = {}) => {
+    const qs = new URLSearchParams(params).toString()
+    return request(`/pont-bascule/pesees${qs ? '?' + qs : ''}`)
+  },
+  pontBasculeVehiculesDuJour: (date, client) => {
+    const params = new URLSearchParams({ date: date || '' })
+    if (client) params.set('client', client)
+    return request(`/pont-bascule/vehicules-du-jour?${params}`)
+  },
+  pontBasculeBilan: (mois) => request(`/pont-bascule/bilan${mois ? '?mois=' + mois : ''}`),
+  pontBasculePresence: (mois) => request(`/pont-bascule/presence${mois ? '?mois=' + mois : ''}`),
+  pontBasculeStats: (date) => request(`/pont-bascule/stats${date ? '?date=' + date : ''}`),
+  pontBasculeResumeVehicule: (immat, date) =>
+    request(`/pont-bascule/resume-vehicule?immat=${encodeURIComponent(immat)}&date=${date}`),
+  pontBasculeSync: (date) =>
+    request('/pont-bascule/sync', { method: 'POST', body: JSON.stringify({ date }) }),
+
   // ═══ Health ═══
   health: () => fetch(`${BASE}/health`).then(r => r.json()),
 }

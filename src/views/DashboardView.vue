@@ -3,11 +3,12 @@ import { useAuthStore } from '@/stores/auth'
 import { useAgentsStore } from '@/stores/agents'
 import { usePrimesStore } from '@/stores/primes'
 import { useSaisiesStore } from '@/stores/saisies'
+import { usePontBasculeStore } from '@/stores/pontBascule'
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   TrendingUp, Truck, MapPin, ShieldCheck, Wrench,
-  AlertTriangle, Users, ArrowUpRight, ArrowDownRight, UserPlus, Search, ArrowRight
+  AlertTriangle, Users, ArrowUpRight, ArrowDownRight, UserPlus, Search, ArrowRight, Zap
 } from 'lucide-vue-next'
 import BaseChart from '@/components/ui/BaseChart.vue'
 import AgentSearchInput from '@/components/ui/AgentSearchInput.vue'
@@ -16,6 +17,7 @@ const authStore = useAuthStore()
 const agentsStore = useAgentsStore()
 const primesStore = usePrimesStore()
 const saisiesStore = useSaisiesStore()
+const pontBasculeStore = usePontBasculeStore()
 const router = useRouter()
 
 // Recherche rapide d'agent depuis le tableau de bord
@@ -43,7 +45,7 @@ const agentFiches = computed(() => {
       const fiche = primesStore.calculerFicheAgent({
         typeVehicule: agregation.typeVehicule,
         typeAgent,
-        joursPresents: 28, // TODO: lire depuis les présences
+        joursPresents: 28,
         tonnageMoyen: agregation.tonnageMoyen,
         rotationsMoyennes: agregation.rotationsMoyennes,
         statutsBouclage: agregation.statutsBouclage,
@@ -96,8 +98,14 @@ const primeDistribution = computed(() => {
 const nbAgents = computed(() => agentsStore.agents.length)
 
 const budgetEstime = computed(() => {
+  // Priorité : bilan pont-bascule (données réelles)
+  if (pontBasculeStore.stats) {
+    return pontBasculeStore.stats.totalPrime
+  }
   return agentFiches.value.reduce((total, f) => total + f.fiche.prime.montant, 0)
 })
+
+const totalPenalites = computed(() => pontBasculeStore.stats?.totalPenalites || 0)
 
 const budgetFormate = computed(() => {
   const val = budgetEstime.value
@@ -106,40 +114,43 @@ const budgetFormate = computed(() => {
   return val + ''
 })
 
-const kpis = computed(() => [
-  {
-    label: 'Score moyen global',
-    value: agentFiches.value.length > 0 ? scoreMoyenGlobal.value.toFixed(1) + ' %' : '—',
-    change: agentFiches.value.length + ' agents évalués',
-    trend: 'neutral',
-    color: 'emerald',
-    icon: TrendingUp
-  },
-  {
-    label: 'Saisies Collecte',
-    value: saisiesStore.stats.nbTonnages.toString(),
-    change: 'tonnages enregistrés',
-    trend: 'neutral',
-    color: 'blue',
-    icon: Truck
-  },
-  {
-    label: 'Bouclages déclarés',
-    value: saisiesStore.stats.nbBouclages.toString(),
-    change: 'circuits déclarés',
-    trend: 'neutral',
-    color: 'indigo',
-    icon: MapPin
-  },
-  {
-    label: 'Budget prime (est.)',
-    value: budgetFormate.value + ' XAF',
-    change: nbAgents.value + ' agents',
-    trend: 'neutral',
-    color: 'amber',
-    icon: Users
-  }
-])
+const kpis = computed(() => {
+  const pbStats = pontBasculeStore.stats
+  return [
+    {
+      label: 'Chauffeurs pont-bascule',
+      value: pbStats ? pbStats.nbChauffeurs.toString() : '—',
+      change: pbStats ? `${pbStats.nbNuit} nuit · ${pbStats.nbJour} jour` : 'Chargement...',
+      trend: 'neutral',
+      color: 'emerald',
+      icon: Zap
+    },
+    {
+      label: 'Budget prime (reste à payer)',
+      value: budgetFormate.value + ' XAF',
+      change: pbStats ? `Pénalités: -${totalPenalites.value.toLocaleString()} F` : '',
+      trend: 'neutral',
+      color: 'blue',
+      icon: TrendingUp
+    },
+    {
+      label: 'Présence moyenne',
+      value: pbStats ? pbStats.presenceMoyenne + ' j/30' : '—',
+      change: pbStats ? `${pbStats.nbProrata} agent(s) en prorata` : '',
+      trend: 'neutral',
+      color: 'indigo',
+      icon: Users
+    },
+    {
+      label: 'Saisies Collecte',
+      value: saisiesStore.stats.nbTonnages.toString(),
+      change: `${saisiesStore.stats.nbBouclages} bouclages · ${saisiesStore.stats.nbEntretiens} entretiens`,
+      trend: 'neutral',
+      color: 'amber',
+      icon: Truck
+    }
+  ]
+})
 
 // ── Top agents ──
 const topAgents = computed(() => {
