@@ -4,10 +4,10 @@ import { useAgentsStore } from '@/stores/agents'
 import { usePrimesStore } from '@/stores/primes'
 import { useSaisiesStore } from '@/stores/saisies'
 import { usePontBasculeStore } from '@/stores/pontBascule'
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import {
-  TrendingUp, Truck, MapPin, ShieldCheck, Wrench,
+  TrendingUp, Truck, MapPin, ShieldCheck, Wrench, Recycle, Factory,
   AlertTriangle, Users, ArrowUpRight, ArrowDownRight, UserPlus, Search, ArrowRight, Zap
 } from 'lucide-vue-next'
 import BaseChart from '@/components/ui/BaseChart.vue'
@@ -19,6 +19,9 @@ const primesStore = usePrimesStore()
 const saisiesStore = useSaisiesStore()
 const pontBasculeStore = usePontBasculeStore()
 const router = useRouter()
+
+// Charger les stats TRI au montage
+onMounted(() => saisiesStore.chargerStatsTri())
 
 // Recherche rapide d'agent depuis le tableau de bord
 const searchMatricule = ref('')
@@ -176,8 +179,12 @@ const serviceStatus = computed(() => {
   const pctLogistique = Math.round((saisiesStore.stats.nbEntretiens / Math.max(1, nbAgentsTerrain)) * 100)
   const pctQhse = Math.round((saisiesStore.stats.nbQhse / Math.max(1, nbAgentsTerrain)) * 100)
 
+  const nbAgentsTri = agentsStore.agents.filter(a => a.service === 'TRI').length
+  const pctTri = Math.round((saisiesStore.stats.nbTri / Math.max(1, nbAgentsTri)) * 100)
+
   return [
     { name: 'Collecte', pct: Math.min(100, pctCollecte), icon: Truck, color: 'emerald' },
+    { name: 'Décharge (TRI)', pct: Math.min(100, pctTri), icon: Recycle, color: 'teal' },
     { name: 'Géolocalisation', pct: Math.min(100, pctGeo), icon: MapPin, color: 'blue' },
     { name: 'Logistique', pct: Math.min(100, pctLogistique), icon: Wrench, color: 'amber' },
     { name: 'QHSE', pct: Math.min(100, pctQhse), icon: ShieldCheck, color: 'purple' },
@@ -349,6 +356,59 @@ function scoreDotClass(score) {
         </div>
       </div>
 
+      <!-- ═══ SERVICE DÉCHARGE ═══ -->
+      <div class="bg-white rounded-xl border border-orange-200 overflow-hidden">
+        <div class="px-5 py-4 bg-orange-50 border-b border-orange-100 flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center">
+              <Factory class="w-5 h-5 text-orange-600" />
+            </div>
+            <div>
+              <h3 class="text-sm font-bold text-orange-900">Service Décharge — Gestion des Déchets</h3>
+              <p class="text-xs text-orange-600">Réception des camions · Pesées pont-bascule</p>
+            </div>
+          </div>
+          <router-link
+            to="/decharge/reception"
+            class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-orange-700 bg-white border border-orange-200 rounded-xl hover:bg-orange-50 transition-colors"
+          >
+            Réception
+            <ArrowRight class="w-4 h-4" />
+          </router-link>
+        </div>
+        <div class="p-5">
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+            <div class="bg-orange-50/50 rounded-lg p-3 text-center">
+              <p class="text-2xl font-bold text-orange-700 font-mono">{{ pontBasculeStore.stats?.nbChauffeurs || '—' }}</p>
+              <p class="text-[11px] text-gray-500 font-medium mt-0.5">Camions / mois</p>
+            </div>
+            <div class="bg-orange-50/50 rounded-lg p-3 text-center">
+              <p class="text-2xl font-bold text-orange-700 font-mono">
+                {{ pontBasculeStore.stats ? Math.round(pontBasculeStore.stats.totalPrime / 1000) + 'K' : '—' }}
+              </p>
+              <p class="text-[11px] text-gray-500 font-medium mt-0.5">Budget prime (XAF)</p>
+            </div>
+            <div class="bg-orange-50/50 rounded-lg p-3 text-center">
+              <p class="text-2xl font-bold text-orange-700 font-mono">
+                {{ pontBasculeStore.stats ? pontBasculeStore.stats.presenceMoyenne.toFixed(0) + '%' : '—' }}
+              </p>
+              <p class="text-[11px] text-gray-500 font-medium mt-0.5">Présence moyenne</p>
+            </div>
+          </div>
+          <div class="mt-4 flex flex-wrap gap-2">
+            <router-link to="/decharge/tableau-de-bord" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-orange-700 bg-orange-50 border border-orange-200 rounded-lg hover:bg-orange-100 transition-colors">
+              <Factory class="w-3.5 h-3.5" /> Tableau de bord
+            </router-link>
+            <router-link to="/decharge/reception" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-orange-700 bg-orange-50 border border-orange-200 rounded-lg hover:bg-orange-100 transition-colors">
+              <Truck class="w-3.5 h-3.5" /> Réception camions
+            </router-link>
+            <router-link to="/decharge/historique" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors">
+              Historique
+            </router-link>
+          </div>
+        </div>
+      </div>
+
       <!-- Pas de saisies encore -->
       <div v-if="!hasSaisies" class="bg-amber-50 border border-amber-200 rounded-xl p-5 flex items-start gap-3">
         <AlertTriangle class="w-5 h-5 text-amber-500 mt-0.5 flex-shrink-0" />
@@ -424,6 +484,10 @@ function scoreDotClass(score) {
                 <span class="text-sm text-gray-600">QHSE</span>
                 <span class="text-sm font-bold text-gray-900">{{ saisiesStore.stats.nbQhse }}</span>
               </div>
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-gray-600">Décharge (TRI)</span>
+                <span class="text-sm font-bold text-teal-700">{{ saisiesStore.stats.nbTri }}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -431,12 +495,13 @@ function scoreDotClass(score) {
         <!-- Service completion -->
         <div v-if="serviceStatus.length > 0" class="bg-white rounded-xl border border-gray-100 p-5">
           <h3 class="text-sm font-semibold text-gray-900 mb-4">Taux de complétion des saisies par service</h3>
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             <div v-for="svc in serviceStatus" :key="svc.name" class="flex items-center gap-4 p-3 rounded-lg bg-gray-50/50">
               <div
                 class="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
                 :class="{
                   'bg-emerald-100 text-emerald-600': svc.color === 'emerald',
+                  'bg-teal-100 text-teal-600': svc.color === 'teal',
                   'bg-blue-100 text-blue-600': svc.color === 'blue',
                   'bg-amber-100 text-amber-600': svc.color === 'amber',
                   'bg-purple-100 text-purple-600': svc.color === 'purple',

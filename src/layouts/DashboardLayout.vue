@@ -1,6 +1,6 @@
 <script setup>
 import {
-  Truck, MapPin, Wrench, ShieldCheck, LogOut, Landmark,
+  Truck, MapPin, Wrench, ShieldCheck, LogOut, Landmark, Factory,
   LayoutDashboard, ClipboardList, Route, History,
   CheckCircle, Wine, Recycle, Users, SlidersHorizontal,
   FileCheck, FileSpreadsheet, ChevronDown, Menu, X,
@@ -38,6 +38,7 @@ const sectionRoots = {
   'Logistique': '/logistique/entretien',
   'QHSE': '/qhse/checklist',
   'TRI': '/tri/saisie',
+  'DÉCHARGE': '/decharge/tableau-de-bord',
   'DAF': '/daf/budget',
 }
 
@@ -131,6 +132,19 @@ const navGroups = computed(() => [
         ]
   },
   {
+    id: 'decharge',
+    label: 'DÉCHARGE',
+    icon: Factory,
+    show: authStore.hasRole(['DECHARGE']),
+    items: isDaf.value
+      ? [{ name: 'Historique Décharge', to: '/decharge/historique', icon: History }]
+      : [
+          { name: 'Tableau de bord', to: '/decharge/tableau-de-bord', icon: LayoutDashboard },
+          { name: 'Réception Camions', to: '/decharge/reception', icon: Truck },
+          { name: 'Historique', to: '/decharge/historique', icon: History },
+        ]
+  },
+  {
     id: 'daf',
     label: 'DAF',
     icon: Landmark,
@@ -155,6 +169,7 @@ const roleColors = {
   LOGISTIQUE: 'bg-amber-500/15 text-amber-400',
   QHSE: 'bg-purple-500/15 text-purple-400',
   TRI: 'bg-teal-500/15 text-teal-400',
+  DECHARGE: 'bg-orange-500/15 text-orange-400',
   LECTURE: 'bg-gray-500/15 text-gray-400',
 }
 </script>

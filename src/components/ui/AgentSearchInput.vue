@@ -7,6 +7,7 @@ const props = defineProps({
   modelValue: { type: String, default: '' },
   date: { type: String, default: '' },
   filterPresents: { type: Boolean, default: false },
+  serviceFilter: { type: String, default: '' },
   label: { type: String, default: 'Agent (Matricule ou Nom)' },
   required: { type: Boolean, default: false },
   placeholder: { type: String, default: 'Tapez un matricule ou un nom...' },
@@ -25,6 +26,11 @@ const containerRef = ref(null)
 // Résultats filtrés
 const results = computed(() => {
   let list = agentsStore.searchAgents(query.value)
+
+  // Filtrer par service si demandé (ex: 'TRI', 'COLLECTE')
+  if (props.serviceFilter) {
+    list = list.filter(a => a.service === props.serviceFilter)
+  }
 
   // Si on filtre par présence et qu'une date est définie
   if (props.filterPresents && props.date) {

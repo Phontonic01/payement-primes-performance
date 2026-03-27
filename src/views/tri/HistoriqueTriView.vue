@@ -35,24 +35,37 @@ function formatDate(iso) {
 
 const columns = [
   { key: 'dateFr', label: 'Date' },
+  { key: 'chauffeur_nom', label: 'Chauffeur' },
   { key: 'arrondissement', label: 'Zone' },
-  { key: 'type_equipement', label: 'Équipement' },
-  { key: 'valeur', label: 'Valeur' },
-  { key: 'pourcentageFr', label: '% Prime' },
-  { key: 'montantFr', label: 'Montant' },
+  { key: 'immatriculation', label: 'Véhicule' },
+  { key: 'valeur', label: 'Tonnage / Bennes' },
+  { key: 'ripeurs', label: 'Ripeurs' },
+  { key: 'montantFr', label: 'Prime' },
 ]
 
-const historiques = computed(() =>
-  rawData.value.map(r => ({
+const historiques = computed(() => {
+  let list = rawData.value.map(r => ({
     ...r,
     dateFr: formatDate(r.date),
     valeur: r.type_equipement === 'BOM_CANTER' ? r.tonnage_collecte + ' t' : r.bennes_levees + ' bennes',
-    pourcentageFr: r.pourcentage_prime + '%',
-    montantFr: (r.montant_prime || 0).toLocaleString() + ' F',
+    montantFr: (r.montant_prime || 0).toLocaleString('fr-FR') + ' F',
+    ripeurs: [r.ripeur1_nom, r.ripeur2_nom, r.ripeur3_nom].filter(Boolean).join(', ') || '-',
   }))
-)
 
-const filteredHistoriques = computed(() => historiques.value)
+  // Filtrer par agent si recherche active
+  if (agentFilter.value) {
+    const q = agentFilter.value.toLowerCase()
+    list = list.filter(r =>
+      (r.chauffeur_nom || '').toLowerCase().includes(q) ||
+      (r.chauffeur_matricule || '').includes(q) ||
+      (r.ripeur1_nom || '').toLowerCase().includes(q) ||
+      (r.ripeur2_nom || '').toLowerCase().includes(q) ||
+      (r.ripeur3_nom || '').toLowerCase().includes(q)
+    )
+  }
+
+  return list
+})
 </script>
 
 <template>
@@ -63,7 +76,7 @@ const filteredHistoriques = computed(() => historiques.value)
       </div>
       <div>
         <h1 class="text-2xl font-bold text-gray-900">Historique Collecte Sélective</h1>
-        <p class="text-sm text-gray-500">Service TRI - Suivi des pesées et bonus recyclage</p>
+        <p class="text-sm text-gray-500">Service TRI — Saisies pont-bascule + ripeurs</p>
       </div>
     </div>
 
@@ -71,38 +84,34 @@ const filteredHistoriques = computed(() => historiques.value)
     <div class="rounded-xl bg-teal-50 border border-teal-100 p-4 flex items-start gap-3">
       <Recycle class="w-5 h-5 text-teal-500 mt-0.5 shrink-0" />
       <p class="text-sm text-teal-700">
-        Ce tableau recense toutes les pesées de collecte sélective effectuées par le service TRI.
-        Les bonus sont calculés automatiquement selon le barème en vigueur.
+        Ce tableau recense toutes les saisies du service TRI : chauffeurs et tonnages du pont-bascule, ripeurs saisis manuellement.
       </p>
     </div>
 
     <BaseCard>
       <div class="flex flex-col md:flex-row gap-4 mb-6 items-end">
-        <input type="month" class="block text-sm bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-gray-900 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition-colors" />
+        <input
+          v-model="moisFiltre"
+          type="month"
+          class="block text-sm bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-gray-900 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition-colors"
+        />
         <div class="flex-1 max-w-sm">
           <AgentSearchInput
             v-model="agentFilter"
-            label="Filtrer par agent"
+            serviceFilter="TRI"
+            label="Filtrer par agent TRI"
             placeholder="Matricule ou nom..."
             :filter-presents="false"
           />
         </div>
       </div>
 
-      <TableSkeleton v-if="loading" :rows="5" :cols="8" />
+      <TableSkeleton v-if="loading" :rows="5" :cols="7" />
       <template v-else>
-        <BaseTable v-if="historiques.length > 0" :columns="columns" :rows="filteredHistoriques">
-          <template #cell-total="{ value }">
-            <span class="font-semibold text-teal-700">{{ value }} kg</span>
-          </template>
-          <template #cell-etat="{ value }">
-            <BaseBadge v-if="value === 'ENREGISTRE'" status="success" text="Enregistré" />
-            <BaseBadge v-else status="neutral" :text="value" />
-          </template>
-        </BaseTable>
+        <BaseTable v-if="historiques.length > 0" :columns="columns" :rows="historiques" />
         <div v-else class="text-center py-12 text-gray-400">
           <Recycle class="w-10 h-10 mx-auto mb-3 opacity-40" />
-          <p class="text-sm font-medium">Aucune pesée enregistrée pour cette période</p>
+          <p class="text-sm font-medium">Aucune saisie TRI pour cette période</p>
           <p class="text-xs mt-1">Les saisies de collecte sélective apparaîtront ici.</p>
         </div>
       </template>

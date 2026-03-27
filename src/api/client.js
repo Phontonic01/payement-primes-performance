@@ -126,12 +126,18 @@ export const api = {
     const qs = new URLSearchParams(params).toString()
     return request(`/pont-bascule/pesees${qs ? '?' + qs : ''}`)
   },
-  pontBasculeVehiculesDuJour: (date, client) => {
+  pontBasculeVehiculesDuJour: (date, client, service) => {
     const params = new URLSearchParams({ date: date || '' })
     if (client) params.set('client', client)
+    if (service) params.set('service', service)
     return request(`/pont-bascule/vehicules-du-jour?${params}`)
   },
-  pontBasculeBilan: (mois) => request(`/pont-bascule/bilan${mois ? '?mois=' + mois : ''}`),
+  pontBasculeBilan: (mois, service) => {
+    const params = new URLSearchParams()
+    if (mois) params.set('mois', mois)
+    if (service) params.set('service', service)
+    return request(`/pont-bascule/bilan?${params}`)
+  },
   pontBasculePresence: (mois) => request(`/pont-bascule/presence${mois ? '?mois=' + mois : ''}`),
   pontBasculeStats: (date) => request(`/pont-bascule/stats${date ? '?date=' + date : ''}`),
   pontBasculeResumeVehicule: (immat, date) =>

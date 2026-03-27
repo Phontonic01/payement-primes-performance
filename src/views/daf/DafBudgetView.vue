@@ -253,9 +253,10 @@ const chartOptions = {
                 <th class="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase">Equipe</th>
                 <th class="text-right px-3 py-3 text-xs font-semibold text-gray-500 uppercase">Plafond</th>
                 <th class="text-right px-3 py-3 text-xs font-semibold text-gray-500 uppercase">Sanctions</th>
-                <th class="text-right px-3 py-3 text-xs font-semibold text-gray-500 uppercase">Apres sanctions</th>
+                <th class="text-right px-3 py-3 text-xs font-semibold text-gray-500 uppercase">Apres sanct.</th>
                 <th class="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase">Presence</th>
-                <th class="text-right px-3 py-3 text-xs font-semibold text-gray-500 uppercase">Reste a payer</th>
+                <th class="text-right px-3 py-3 text-xs font-semibold text-red-500 uppercase">Total deduit</th>
+                <th class="text-right px-3 py-3 text-xs font-semibold text-emerald-600 uppercase">A payer</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-50">
@@ -273,7 +274,7 @@ const chartOptions = {
                 <td class="px-3 py-2.5 text-center">
                   <span class="text-xs">{{ c.equipe === 'NUIT' ? '🌙' : '☀️' }}</span>
                 </td>
-                <td class="px-3 py-2.5 text-right font-mono text-xs text-gray-500">{{ formatXAF(plafond) }}</td>
+                <td class="px-3 py-2.5 text-right font-mono text-xs text-gray-400">{{ formatXAF(plafond) }}</td>
                 <td class="px-3 py-2.5 text-right font-mono text-xs font-semibold" :class="c.penalites.total > 0 ? 'text-red-600' : 'text-gray-300'">
                   {{ c.penalites.total > 0 ? '-' + formatXAF(c.penalites.total) : '0' }}
                 </td>
@@ -281,14 +282,17 @@ const chartOptions = {
                   {{ formatXAF(c.prime_avant_presence || (plafond - c.penalites.total)) }}
                 </td>
                 <td class="px-3 py-2.5 text-center">
-                  <span
-                    class="font-mono text-xs font-bold px-1.5 py-0.5 rounded"
-                    :class="c.taux_presence >= 93 ? 'text-emerald-700 bg-emerald-50' : c.taux_presence >= 70 ? 'text-amber-700 bg-amber-50' : 'text-red-700 bg-red-50'"
-                  >
+                  <span class="font-mono text-xs font-bold px-1.5 py-0.5 rounded"
+                    :class="c.taux_presence >= 93 ? 'text-emerald-700 bg-emerald-50' : c.taux_presence >= 70 ? 'text-amber-700 bg-amber-50' : 'text-red-700 bg-red-50'">
                     {{ c.taux_presence }}%
                   </span>
-                  <span v-if="c.prorata" class="block text-[9px] text-amber-500 font-medium mt-0.5">
-                    prorata
+                  <span v-if="c.prorata" class="block text-[9px] text-amber-600 font-mono font-semibold mt-0.5">
+                    = {{ formatXAF(Math.round((c.prime_avant_presence || (plafond - c.penalites.total)) * c.taux_presence / 100)) }} F
+                  </span>
+                </td>
+                <td class="px-3 py-2.5 text-right">
+                  <span class="font-mono text-xs font-bold text-red-600">
+                    -{{ formatXAF(plafond - c.prime_finale) }} F
                   </span>
                 </td>
                 <td class="px-3 py-2.5 text-right">
@@ -305,8 +309,9 @@ const chartOptions = {
                 <td class="px-3 py-3 text-right font-mono text-gray-700">{{ formatXAF(totalBudget) }}</td>
                 <td class="px-3 py-3 text-right font-mono text-red-600">-{{ formatXAF(totalPenalites) }}</td>
                 <td class="px-3 py-3 text-right font-mono text-gray-700">{{ formatXAF(totalBudget - totalPenalites) }}</td>
-                <td class="px-3 py-3 text-center text-gray-500">—</td>
-                <td class="px-3 py-3 text-right font-mono text-emerald-700">{{ formatXAF(totalPrimes) }} F</td>
+                <td class="px-3 py-3 text-center text-gray-400">—</td>
+                <td class="px-3 py-3 text-right font-mono text-red-600 font-bold">-{{ formatXAF(totalBudget - totalPrimes) }} F</td>
+                <td class="px-3 py-3 text-right font-mono text-emerald-700 text-lg">{{ formatXAF(totalPrimes) }} F</td>
               </tr>
             </tfoot>
           </table>

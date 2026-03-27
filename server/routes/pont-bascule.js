@@ -5,7 +5,7 @@ import {
   listTables, describeTable, getPesees, getPeseesParMois,
   getPeseesParVehicule, getPeseesParTransporteur,
   getStatsDuJour, getPresenceMensuelle, getBilanMensuel,
-  syncPesees, diagnostic
+  syncPesees, diagnostic, determinerEquipe
 } from '../connectors/pont-bascule.js'
 import { db } from '../db.js'
 
@@ -94,11 +94,14 @@ router.get('/stats', async (req, res) => {
   }
 })
 
-// GET /api/pont-bascule/vehicules-du-jour?date=YYYY-MM-DD&client=CLEAN AFRICA
+// GET /api/pont-bascule/vehicules-du-jour?date=YYYY-MM-DD&client=CLEAN AFRICA&service=TRI
 // Liste de tous les véhicules du jour, agrégés (pour le formulaire de saisie)
+// service=TRI → uniquement véhicules TRI (N° de parc 480,484,124,233,128,135,137,140,515)
+// service=COLLECTE → uniquement véhicules Collecte (tout sauf TRI)
 router.get('/vehicules-du-jour', async (req, res) => {
   const date = req.query.date || new Date().toISOString().split('T')[0]
   const clientFilter = req.query.client || null
+  const serviceFilter = req.query.service || null
   try {
     const pesees = await getPesees(date)
     const filtrees = clientFilter
@@ -144,12 +147,30 @@ router.get('/vehicules-du-jour', async (req, res) => {
 
     const joursOuvres = 20
 
+    // Charger les agents locaux pour enrichir avec service/direction
+    const agentsLocaux = db.prepare('SELECT matricule, nom, direction, service, role, fonction FROM agents WHERE statut = ?').all('ACTIF')
+    const agentsParMatricule = {}
+    for (const a of agentsLocaux) { agentsParMatricule[a.matricule] = a }
+
+    // Numéros de parc des véhicules dédiés au TRI
+    // (le pont-bascule utilise le N° de parc dans le champ Immatriculation)
+    const noParcsTRI = new Set(['480', '484', '124', '233', '128', '135', '137', '140', '515'])
+
     // Convertir en tableau trié par tonnage décroissant
     const vehicules = Object.values(parVehicule).map(v => {
-      const joursPresent = presenceMap[v.code_transporteur] || 0
-      const tauxPresence = +(joursPresent / joursOuvres * 100).toFixed(1)
+      const joursPresent = Math.min(presenceMap[v.code_transporteur] || 0, joursOuvres)
+      const tauxPresence = Math.min(+(joursPresent / joursOuvres * 100).toFixed(1), 100)
+      // Service déterminé UNIQUEMENT par le véhicule (N° de parc)
+      const estVehiculeTRI = noParcsTRI.has(String(v.immatriculation).trim())
+      const service = estVehiculeTRI ? 'TRI' : 'COLLECTE'
+      // Recalculer l'équipe avec les bons horaires selon le service
+      const premiereHeure = v.pesees?.[v.pesees.length - 1]?.heure_entree
+      const equipeCorrigee = premiereHeure ? determinerEquipe(premiereHeure, service) : v.equipe
       return {
         ...v,
+        equipe: equipeCorrigee,
+        service,
+        direction: estVehiculeTRI ? 'DQHSE' : '',
         tonnage_tonnes: +(v.tonnage_kg / 1000).toFixed(2),
         rotations: v.pesees.length,
         jours_present: joursPresent,
@@ -158,11 +179,16 @@ router.get('/vehicules-du-jour', async (req, res) => {
       }
     }).sort((a, b) => b.tonnage_kg - a.tonnage_kg)
 
-    // Compter par équipe
-    const nbJour = vehicules.filter(v => v.equipe === 'JOUR').length
-    const nbNuit = vehicules.filter(v => v.equipe === 'NUIT').length
+    // Filtrer par service si demandé
+    const vehiculesFiltres = serviceFilter
+      ? vehicules.filter(v => v.service === serviceFilter)
+      : vehicules
 
-    res.json({ date, mois, jours_ouvres: joursOuvres, total: vehicules.length, nb_jour: nbJour, nb_nuit: nbNuit, vehicules })
+    // Compter par équipe
+    const nbJour = vehiculesFiltres.filter(v => v.equipe === 'JOUR').length
+    const nbNuit = vehiculesFiltres.filter(v => v.equipe === 'NUIT').length
+
+    res.json({ date, mois, jours_ouvres: joursOuvres, total: vehiculesFiltres.length, nb_jour: nbJour, nb_nuit: nbNuit, vehicules: vehiculesFiltres })
   } catch (err) {
     res.status(503).json({ error: err.message })
   }
@@ -179,42 +205,52 @@ router.get('/presence', async (req, res) => {
       mois,
       jours_ouvres: joursOuvres,
       seuil_presence: seuilPresence,
-      chauffeurs: presence.map(c => ({
-        ...c,
-        taux_presence: +(c.jours_present / joursOuvres * 100).toFixed(1),
-        eligible: c.jours_present >= Math.ceil(joursOuvres * seuilPresence),
-      })),
+      chauffeurs: presence.map(c => {
+        const joursEffectifs = Math.min(c.jours_present, joursOuvres)
+        return {
+          ...c,
+          jours_present: joursEffectifs,
+          taux_presence: Math.min(+(joursEffectifs / joursOuvres * 100).toFixed(1), 100),
+          eligible: joursEffectifs >= Math.ceil(joursOuvres * seuilPresence),
+        }
+      }),
     })
   } catch (err) {
     res.status(503).json({ error: err.message })
   }
 })
 
-// GET /api/pont-bascule/bilan?mois=YYYY-MM — bilan mensuel complet avec pénalités jour par jour
+// GET /api/pont-bascule/bilan?mois=YYYY-MM&service=TRI — bilan mensuel complet avec pénalités jour par jour
 router.get('/bilan', async (req, res) => {
   const mois = req.query.mois || new Date().toISOString().slice(0, 7)
+  const serviceFilter = req.query.service || null
   try {
-    const bilan = await getBilanMensuel(mois)
+    // Plafond TRI = 25 000 F, Collecte = 50 000 F
+    const plafondTRI = 25000
+    const plafondCollecte = 50000
+    const plafondBilan = serviceFilter === 'TRI' ? plafondTRI : plafondCollecte
+    const bilan = await getBilanMensuel(mois, 'CLEAN AFRICA', plafondBilan)
 
-    // Enrichir chaque chauffeur avec direction/service/fonction depuis la base locale
-    const agentsLocaux = db.prepare('SELECT nom, direction, service, role, fonction FROM agents WHERE statut = ?').all('ACTIF')
+    // Numéros de parc des véhicules dédiés au TRI
+    const noParcsTRI = new Set(['480', '484', '124', '233', '128', '135', '137', '140', '515'])
 
-    // Index par nom (approximatif) pour matcher avec le pont-bascule
     for (const c of bilan.chauffeurs) {
-      const nomPB = c.chauffeur.toUpperCase().trim()
-      const match = agentsLocaux.find(a => {
-        const nomLocal = a.nom.toUpperCase().trim()
-        // Match exact ou partiel (nom contenu)
-        return nomLocal === nomPB ||
-          nomLocal.includes(nomPB) ||
-          nomPB.includes(nomLocal) ||
-          // Match par premier + dernier mot
-          nomPB.split(' ')[0] === nomLocal.split(' ')[0]
-      })
-      c.direction = match?.direction || ''
-      c.service = match?.service || 'COLLECTE'
-      c.role = match?.role || ''
-      c.fonction = match?.fonction || ''
+      // Service déterminé UNIQUEMENT par le véhicule (N° de parc)
+      const estVehiculeTRI = noParcsTRI.has(String(c.immatriculation).trim())
+      c.service = estVehiculeTRI ? 'TRI' : 'COLLECTE'
+      c.direction = estVehiculeTRI ? 'DQHSE' : ''
+
+      // Ajouter le détail de la retenue présence
+      if (c.prorata) {
+        c.retenue_presence = c.prime_avant_presence - c.prime_finale
+      } else {
+        c.retenue_presence = 0
+      }
+    }
+
+    // Filtrer par service si demandé
+    if (serviceFilter) {
+      bilan.chauffeurs = bilan.chauffeurs.filter(c => c.service === serviceFilter)
     }
 
     res.json(bilan)

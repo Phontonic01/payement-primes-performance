@@ -154,13 +154,25 @@ router.get('/tri', (req, res) => {
 })
 
 router.post('/tri', (req, res) => {
-  const { date, arrondissement, type_equipement, tonnage_collecte, bennes_levees, pourcentage_prime, montant_prime } = req.body
-  if (!date || !arrondissement || !type_equipement) return res.status(400).json({ error: 'date, arrondissement et type_equipement requis' })
+  const { date, arrondissement, immatriculation, chauffeur_matricule, chauffeur_nom,
+    ripeur1_matricule, ripeur1_nom, ripeur2_matricule, ripeur2_nom,
+    ripeur3_matricule, ripeur3_nom, tonnage_collecte, rotations,
+    pourcentage_prime, montant_prime } = req.body
+  if (!date) return res.status(400).json({ error: 'date requise' })
   try {
     const result = db.prepare(`
-      INSERT OR REPLACE INTO tri_saisies (date, arrondissement, type_equipement, tonnage_collecte, bennes_levees, pourcentage_prime, montant_prime)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(date, arrondissement, type_equipement, tonnage_collecte || 0, bennes_levees || 0, pourcentage_prime || 0, montant_prime || 0)
+      INSERT OR REPLACE INTO tri_saisies (date, arrondissement, immatriculation,
+        chauffeur_matricule, chauffeur_nom, ripeur1_matricule, ripeur1_nom,
+        ripeur2_matricule, ripeur2_nom, ripeur3_matricule, ripeur3_nom,
+        tonnage_collecte, rotations, pourcentage_prime, montant_prime)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(date, arrondissement || '', immatriculation || '',
+      chauffeur_matricule || '', chauffeur_nom || '',
+      ripeur1_matricule || '', ripeur1_nom || '',
+      ripeur2_matricule || '', ripeur2_nom || '',
+      ripeur3_matricule || '', ripeur3_nom || '',
+      tonnage_collecte || 0, rotations || 0,
+      pourcentage_prime || 0, montant_prime || 0)
     res.status(201).json({ id: result.lastInsertRowid })
   } catch (e) { res.status(500).json({ error: e.message }) }
 })

@@ -2,7 +2,7 @@
 import { useRouter } from 'vue-router'
 import { ref } from 'vue'
 import {
-  Truck, MapPin, Wrench, ShieldCheck, Recycle, Landmark, Eye,
+  Truck, MapPin, Wrench, ShieldCheck, Recycle, Landmark, Factory, Eye,
   ArrowRight, BarChart3, Shield, Zap, Clock, ChevronRight
 } from 'lucide-vue-next'
 
@@ -43,6 +43,13 @@ const services = [
     description: 'Collecte sélective, pesée des matériaux recyclables.',
     icon: Recycle,
     couleur: 'teal',
+  },
+  {
+    id: 'DECHARGE',
+    nom: 'Décharge',
+    description: 'Gestion des déchets, réception des camions, pesées pont-bascule.',
+    icon: Factory,
+    couleur: 'orange',
   },
   {
     id: 'DAF',
@@ -93,6 +100,11 @@ const colorMap = {
     bg: 'bg-teal-500/10 group-hover:bg-teal-500/20',
     icon: 'text-teal-400',
     border: 'border-teal-500/20 group-hover:border-teal-500/40',
+  },
+  orange: {
+    bg: 'bg-orange-500/10 group-hover:bg-orange-500/20',
+    icon: 'text-orange-400',
+    border: 'border-orange-500/20 group-hover:border-orange-500/40',
   },
   rose: {
     bg: 'bg-rose-500/10 group-hover:bg-rose-500/20',
@@ -165,7 +177,7 @@ const colorMap = {
             </div>
             <div class="w-px h-10 bg-white/[0.08]"></div>
             <div class="text-center">
-              <div class="text-2xl sm:text-3xl font-bold text-white">6</div>
+              <div class="text-2xl sm:text-3xl font-bold text-white">7</div>
               <div class="text-[11px] text-white/30 font-medium uppercase tracking-wider mt-0.5">Services</div>
             </div>
             <div class="w-px h-10 bg-white/[0.08]"></div>

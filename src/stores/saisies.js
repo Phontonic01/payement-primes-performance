@@ -283,11 +283,22 @@ export const useSaisiesStore = defineStore('saisies', () => {
     Object.values(tonnages.value).sort((a, b) => (b.date || '').localeCompare(a.date || ''))
   )
 
+  const nbTriSaisies = ref(0)
+
+  // Charger le nombre de saisies TRI depuis l'API
+  async function chargerStatsTri(mois) {
+    try {
+      const data = await api.getSaisiesStats(mois)
+      nbTriSaisies.value = data.tri || 0
+    } catch { /* non bloquant */ }
+  }
+
   const stats = computed(() => ({
     nbTonnages: Object.keys(tonnages.value).length,
     nbBouclages: Object.keys(bouclages.value).length,
     nbEntretiens: Object.keys(entretiens.value).length,
     nbQhse: Object.keys(qhseEvals.value).length,
+    nbTri: nbTriSaisies.value,
   }))
 
   return {
@@ -298,6 +309,6 @@ export const useSaisiesStore = defineStore('saisies', () => {
     enregistrerEntretien, getEntretien,
     enregistrerQhse, getQhse,
     getAgregationMensuelle, historiqueTonnages, stats,
-    chargerMois,
+    chargerMois, chargerStatsTri,
   }
 })

@@ -127,16 +127,26 @@ async function describeTable(tableName) {
 
 /**
  * Déterminer l'équipe (JOUR ou NUIT) à partir de l'heure d'entrée.
- * JOUR  = 09h00 à 18h30
- * NUIT  = 19h00 à 08h30 (du lendemain)
+ *
+ * Collecte : JOUR = 09h00 à 18h30 / NUIT = 19h00 à 08h30
+ * TRI      : JOUR = 07h00 à 17h00 / NUIT = 19h00 à 05h00
+ *
+ * @param {string} service - 'TRI' ou 'COLLECTE' (défaut)
  */
-function determinerEquipe(heureEntree) {
+function determinerEquipe(heureEntree, service = 'COLLECTE') {
   if (!heureEntree) return 'NUIT'
   const h = new Date(heureEntree)
   const heure = h.getUTCHours()
   const minutes = h.getUTCMinutes()
   const totalMinutes = heure * 60 + minutes
-  // JOUR = 09:00 (540) à 18:30 (1110)
+
+  if (service === 'TRI') {
+    // TRI : JOUR = 07:00 (420) à 17:00 (1020)
+    if (totalMinutes >= 420 && totalMinutes <= 1020) return 'JOUR'
+    return 'NUIT'
+  }
+
+  // COLLECTE : JOUR = 09:00 (540) à 18:30 (1110)
   if (totalMinutes >= 540 && totalMinutes <= 1110) return 'JOUR'
   return 'NUIT'
 }
@@ -273,7 +283,7 @@ async function getStatsDuJour(date) {
  * - Pénalités journalières cumulées par axe tonnage
  * - Prime restante après dégression
  */
-async function getBilanMensuel(mois, client = 'CLEAN AFRICA') {
+async function getBilanMensuel(mois, client = 'CLEAN AFRICA', plafondParam = null) {
   const [annee, m] = mois.split('-').map(Number)
   const p = await connectPontBascule()
 
@@ -304,7 +314,7 @@ async function getBilanMensuel(mois, client = 'CLEAN AFRICA') {
         )
       ORDER BY Code_Transporteur, Annee, Mois, Jour
     `)
-  const plafond = 50000
+  const plafond = plafondParam || 50000
   const partTonnage = plafond * 0.50 // 25000 F pour l'axe tonnage
   const primeJourTonnage = partTonnage / joursOuvres // ~833 F/jour
 
@@ -327,12 +337,19 @@ async function getBilanMensuel(mois, client = 'CLEAN AFRICA') {
     chauffeursPesees[code].push(row)
   }
 
+  // N° de parc des véhicules TRI (pour déterminer les horaires d'équipe)
+  const noParcsTRI = new Set(['480', '484', '124', '233', '128', '135', '137', '140', '515'])
+
   const chauffeurs = {}
   for (const [code, pesees] of Object.entries(chauffeursPesees)) {
-    // Compter combien de pesées JOUR vs NUIT pour ce chauffeur
+    // Déterminer le service par le véhicule (N° de parc)
+    const immat = String(pesees[0].Immatriculation || '').trim()
+    const serviceChauffeur = noParcsTRI.has(immat) ? 'TRI' : 'COLLECTE'
+
+    // Compter combien de pesées JOUR vs NUIT (avec les bons horaires selon le service)
     let nbJour = 0, nbNuit = 0
     for (const row of pesees) {
-      if (determinerEquipe(row.Heure_Entree) === 'JOUR') nbJour++
+      if (determinerEquipe(row.Heure_Entree, serviceChauffeur) === 'JOUR') nbJour++
       else nbNuit++
     }
     const equipe = nbJour > nbNuit ? 'JOUR' : 'NUIT'
@@ -347,7 +364,7 @@ async function getBilanMensuel(mois, client = 'CLEAN AFRICA') {
 
     // Ne garder que les pesées correspondant à l'équipe du chauffeur
     for (const row of pesees) {
-      const eqPesee = determinerEquipe(row.Heure_Entree)
+      const eqPesee = determinerEquipe(row.Heure_Entree, serviceChauffeur)
       if (eqPesee !== equipe) continue // ignorer les pesées hors équipe
 
       const jour = row.Jour
@@ -552,5 +569,6 @@ export {
   getBilanMensuel,
   syncPesees,
   diagnostic,
+  determinerEquipe,
   CONFIG,
 }

@@ -32,7 +32,7 @@ export const useVehiculesStore = defineStore('vehicules', () => {
     { noParc: '132', type: 'Plateaux', particularite: 'PLATEAU', affectation: 'Collecte', marque: 'ISUZU MOTORS', modele: 'NPR 71H', immatriculation: 'KW-851-AA', etat: 'Opérationnel', observation: '' },
     { noParc: '133', type: 'Plateaux', particularite: 'PLATEAU', affectation: 'Tri', marque: 'ISUZU MOTORS', modele: 'NPR 71H', immatriculation: 'KX-633-AA', etat: 'Opérationnel', observation: '' },
     { noParc: '134', type: 'Plateaux', particularite: 'PLATEAU', affectation: 'Collecte', marque: 'SML SAMRAT', modele: 'TIPPER', immatriculation: 'LD-486-AA', etat: 'Opérationnel', observation: '' },
-    { noParc: '135', type: 'Plateaux', particularite: 'PLATEAU', affectation: 'Collecte', marque: 'SML SAMRAT', modele: 'TIPPER', immatriculation: 'LD-487-AA', etat: 'Opérationnel', observation: '' },
+    { noParc: '135', type: 'Plateaux', particularite: 'PLATEAU', affectation: 'Tri', marque: 'SML SAMRAT', modele: 'TIPPER', immatriculation: 'LD-487-AA', etat: 'Opérationnel', observation: '' },
     { noParc: '136', type: 'Plateaux', particularite: 'PLATEAU', affectation: 'Collecte', marque: 'SML SAMRAT', modele: 'TIPPER', immatriculation: 'LD-489-AA', etat: 'Opérationnel', observation: '' },
     { noParc: '137', type: 'Plateaux', particularite: 'PLATEAU', affectation: 'Tri', marque: 'SML SAMRAT', modele: 'TIPPER', immatriculation: 'LD-490-AA', etat: 'Opérationnel', observation: '' },
     { noParc: '138', type: 'Plateaux', particularite: 'PLATEAU', affectation: 'Collecte', marque: 'SML SAMRAT', modele: 'TIPPER', immatriculation: 'LD-492-AA', etat: 'Panne', observation: 'Kit embrayage à changer' },
@@ -78,11 +78,11 @@ export const useVehiculesStore = defineStore('vehicules', () => {
     // ══════════════════════════════════════════
     // BOM (50)
     // ══════════════════════════════════════════
-    { noParc: '480', type: 'BOM', particularite: 'BOM', affectation: '', marque: 'MAN', modele: 'TGS 33,360-6X4', immatriculation: 'JS-466-AA', etat: 'Opérationnel', observation: '' },
+    { noParc: '480', type: 'BOM', particularite: 'BOM', affectation: 'Tri', marque: 'MAN', modele: 'TGS 33,360-6X4', immatriculation: 'JS-466-AA', etat: 'Opérationnel', observation: '' },
     { noParc: '481', type: 'BOM', particularite: 'BOM', affectation: '', marque: 'MERCEDES', modele: '3342 K39', immatriculation: 'AB-733-AA', etat: 'Panne', observation: '' },
     { noParc: '482', type: 'BOM', particularite: 'BOM', affectation: '', marque: 'HONGYAN IVECO', modele: 'KING KAN 340', immatriculation: 'KB-983-AA', etat: 'Opérationnel', observation: '' },
     { noParc: '483', type: 'BOM', particularite: 'BOM', affectation: '', marque: 'HONGYAN IVECO', modele: 'KING KAN 340', immatriculation: 'KC-010-AA', etat: 'Opérationnel', observation: '' },
-    { noParc: '484', type: 'BOM', particularite: 'BOM', affectation: '', marque: 'HONGYAN IVECO', modele: 'KING KAN 340', immatriculation: 'KC-012-AA', etat: 'Opérationnel', observation: '' },
+    { noParc: '484', type: 'BOM', particularite: 'BOM', affectation: 'Tri', marque: 'HONGYAN IVECO', modele: 'KING KAN 340', immatriculation: 'KC-012-AA', etat: 'Opérationnel', observation: '' },
     { noParc: '485', type: 'BOM', particularite: 'BOM', affectation: '', marque: 'HONGYAN IVECO', modele: 'KING KAN 340', immatriculation: 'KC-009-AA', etat: 'Opérationnel', observation: '' },
     { noParc: '486', type: 'BOM', particularite: 'BOM', affectation: '', marque: 'HONGYAN IVECO', modele: 'KING KAN 340', immatriculation: 'KC-019-AA', etat: 'Opérationnel', observation: '' },
     { noParc: '487', type: 'BOM', particularite: 'BOM', affectation: '', marque: 'HONGYAN IVECO', modele: 'KING KAN 340', immatriculation: 'KC-982-AA', etat: 'Opérationnel', observation: '' },
@@ -111,7 +111,7 @@ export const useVehiculesStore = defineStore('vehicules', () => {
     { noParc: '512', type: 'BOM', particularite: 'BOM', affectation: '', marque: 'HONGYAN IVECO', modele: 'KING KAN 340', immatriculation: 'KC-007-AA', etat: 'Opérationnel', observation: '' },
     { noParc: '513', type: 'BOM', particularite: 'BOM', affectation: '', marque: 'MAN', modele: 'TGS 33,360-6X4', immatriculation: 'KC-264-AA', etat: 'Opérationnel', observation: '' },
     { noParc: '514', type: 'BOM', particularite: 'BOM', affectation: '', marque: 'MAN', modele: 'TGS 33,360-6X4', immatriculation: 'KC-263-AA', etat: 'Opérationnel', observation: '' },
-    { noParc: '515', type: 'BOM', particularite: 'BOM', affectation: '', marque: 'MAN', modele: 'TGS 33,360-6X4', immatriculation: 'KC-262-AA', etat: 'Opérationnel', observation: '' },
+    { noParc: '515', type: 'BOM', particularite: 'BOM', affectation: 'Tri', marque: 'MAN', modele: 'TGS 33,360-6X4', immatriculation: 'KC-262-AA', etat: 'Opérationnel', observation: '' },
     { noParc: '516', type: 'BOM', particularite: 'BOM', affectation: '', marque: 'MAN', modele: 'TGS 33,360-6X4', immatriculation: 'KC-265-AA', etat: 'Opérationnel', observation: '' },
     { noParc: '517', type: 'BOM', particularite: 'BOM', affectation: '', marque: 'HONGYAN IVECO', modele: 'KING KAN 340', immatriculation: '', etat: 'Opérationnel', observation: '' },
     { noParc: '518', type: 'BOM', particularite: 'BOM', affectation: '', marque: 'HONGYAN IVECO', modele: 'KING KAN 340', immatriculation: '', etat: 'Opérationnel', observation: '' },

@@ -132,14 +132,22 @@ const SCHEMA = `
   CREATE TABLE IF NOT EXISTS tri_saisies (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     date TEXT NOT NULL,
-    arrondissement TEXT NOT NULL,
-    type_equipement TEXT NOT NULL,
+    arrondissement TEXT DEFAULT '',
+    immatriculation TEXT DEFAULT '',
+    chauffeur_matricule TEXT DEFAULT '',
+    chauffeur_nom TEXT DEFAULT '',
+    ripeur1_matricule TEXT DEFAULT '',
+    ripeur1_nom TEXT DEFAULT '',
+    ripeur2_matricule TEXT DEFAULT '',
+    ripeur2_nom TEXT DEFAULT '',
+    ripeur3_matricule TEXT DEFAULT '',
+    ripeur3_nom TEXT DEFAULT '',
     tonnage_collecte REAL DEFAULT 0,
-    bennes_levees INTEGER DEFAULT 0,
-    pourcentage_prime INTEGER DEFAULT 0,
+    rotations INTEGER DEFAULT 0,
+    pourcentage_prime REAL DEFAULT 0,
     montant_prime INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(date, arrondissement, type_equipement)
+    UNIQUE(date, chauffeur_matricule)
   );
 
   CREATE TABLE IF NOT EXISTS geo_decisions (
@@ -220,6 +228,23 @@ db.pragma('journal_mode = WAL')
 SCHEMA.split(';').filter(s => s.trim()).forEach(stmt => {
   try { db.prepare(stmt + ';').run() } catch {}
 })
+
+// Migration : ajouter les colonnes manquantes à tri_saisies si table existe déjà
+const triMigrations = [
+  'ALTER TABLE tri_saisies ADD COLUMN immatriculation TEXT DEFAULT ""',
+  'ALTER TABLE tri_saisies ADD COLUMN chauffeur_matricule TEXT DEFAULT ""',
+  'ALTER TABLE tri_saisies ADD COLUMN chauffeur_nom TEXT DEFAULT ""',
+  'ALTER TABLE tri_saisies ADD COLUMN ripeur1_matricule TEXT DEFAULT ""',
+  'ALTER TABLE tri_saisies ADD COLUMN ripeur1_nom TEXT DEFAULT ""',
+  'ALTER TABLE tri_saisies ADD COLUMN ripeur2_matricule TEXT DEFAULT ""',
+  'ALTER TABLE tri_saisies ADD COLUMN ripeur2_nom TEXT DEFAULT ""',
+  'ALTER TABLE tri_saisies ADD COLUMN ripeur3_matricule TEXT DEFAULT ""',
+  'ALTER TABLE tri_saisies ADD COLUMN ripeur3_nom TEXT DEFAULT ""',
+  'ALTER TABLE tri_saisies ADD COLUMN rotations INTEGER DEFAULT 0',
+]
+for (const sql of triMigrations) {
+  try { db.prepare(sql).run() } catch {}
+}
 
 // ═══ Seed agents ═══
 

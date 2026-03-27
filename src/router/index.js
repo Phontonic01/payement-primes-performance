@@ -128,6 +128,25 @@ const router = createRouter({
       component: () => import('@/views/tri/HistoriqueTriView.vue'),
       meta: { requiresAuth: true, layout: 'DashboardLayout', title: 'Historique TRI', breadcrumb: ['TRI', 'Historique TRI'] }
     },
+    // DÉCHARGE (Gestion des déchets)
+    {
+      path: '/decharge/tableau-de-bord',
+      name: 'decharge-tableau-de-bord',
+      component: () => import('@/views/decharge/DechargeTableauBordView.vue'),
+      meta: { requiresAuth: true, layout: 'DashboardLayout', title: 'Tableau de Bord', breadcrumb: ['DÉCHARGE', 'Tableau de Bord'] }
+    },
+    {
+      path: '/decharge/reception',
+      name: 'decharge-reception',
+      component: () => import('@/views/decharge/DechargeReceptionView.vue'),
+      meta: { requiresAuth: true, layout: 'DashboardLayout', title: 'Réception Camions', breadcrumb: ['DÉCHARGE', 'Réception Camions'] }
+    },
+    {
+      path: '/decharge/historique',
+      name: 'decharge-historique',
+      component: () => import('@/views/decharge/DechargeHistoriqueView.vue'),
+      meta: { requiresAuth: true, layout: 'DashboardLayout', title: 'Historique Décharge', breadcrumb: ['DÉCHARGE', 'Historique'] }
+    },
     // DAF (Direction Administrative et Financière)
     {
       path: '/daf/budget',

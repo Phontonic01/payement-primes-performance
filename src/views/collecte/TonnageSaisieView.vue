@@ -181,6 +181,51 @@ const vehiculesFiltres = computed(() => {
 const nbJour = computed(() => vehiculesDuJour.value.filter(v => v.equipe === 'JOUR').length)
 const nbNuit = computed(() => vehiculesDuJour.value.filter(v => v.equipe === 'NUIT').length)
 
+// ── Fiche détaillée d'un agent (historique mensuel) ──
+const ficheAgent = ref(null)
+const ficheLoading = ref(false)
+
+function ouvrirFicheAgent(v) {
+  // Chercher dans le bilan mensuel (chargé en parallèle avec vehicules du jour)
+  const bilan = bilanMensuel.value
+  const code = String(v.code_transporteur)
+
+  if (bilan?.chauffeurs) {
+    const agent = bilan.chauffeurs.find(c => String(c.code_transporteur) === code)
+    if (agent) {
+      ficheAgent.value = { ...agent, immatriculation: v.immatriculation }
+      // Scroll vers la fiche
+      setTimeout(() => {
+        document.getElementById('fiche-agent-detail')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 100)
+      return
+    }
+  }
+
+  // Fallback : afficher au moins les données du jour
+  ficheAgent.value = {
+    code_transporteur: v.code_transporteur,
+    chauffeur: v.chauffeur,
+    immatriculation: v.immatriculation,
+    equipe: v.equipe,
+    jours_present: v.jours_present || 0,
+    taux_presence: v.taux_presence || 0,
+    plafond: plafond.value,
+    penalites: v.penalites_mois || { tonnage: 0, bouclage: 0, entretien: 0, qhse: 0, total: 0 },
+    prime_avant_presence: plafond.value - (v.penalites_mois?.total || 0),
+    prime_finale: v.prime_finale ?? plafond.value,
+    prorata: v.prorata || false,
+    detail_jours: v.bilan?.detail_jours || [],
+  }
+  setTimeout(() => {
+    document.getElementById('fiche-agent-detail')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, 100)
+}
+
+function fermerFicheAgent() {
+  ficheAgent.value = null
+}
+
 function selectionnerVehicule(v) {
   selectedVehicule.value = v
   activeStep.value = 'ripeur'
@@ -459,7 +504,7 @@ function submit() {
                 ? 'bg-indigo-600 text-white'
                 : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'"
             >
-              <span class="text-sm">🌙</span> Nuit 19h–8h30 ({{ nbNuit }})
+              <span class="text-sm">🌙</span> Nuit ({{ nbNuit }})
             </button>
             <button
               type="button"
@@ -469,7 +514,7 @@ function submit() {
                 ? 'bg-amber-500 text-white'
                 : 'bg-amber-50 text-amber-700 hover:bg-amber-100'"
             >
-              <span class="text-sm">☀️</span> Jour 9h–18h30 ({{ nbJour }})
+              <span class="text-sm">☀️</span> Jour ({{ nbJour }})
             </button>
           </div>
         </div>
@@ -569,14 +614,17 @@ function submit() {
             <table class="w-full text-sm">
               <thead>
                 <tr class="bg-gray-50 border-b border-gray-100">
-                  <th class="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Immat.</th>
-                  <th class="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Mat.</th>
-                  <th class="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Chauffeur</th>
-                  <th class="text-right px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Tonnage</th>
-                  <th class="text-right px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Tours</th>
-                  <th class="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Présence</th>
-                  <th class="text-right px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Pénalités</th>
-                  <th class="text-right px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Reste à payer</th>
+                  <th class="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase">Immat.</th>
+                  <th class="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase">Mat.</th>
+                  <th class="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase">Chauffeur</th>
+                  <th class="text-right px-3 py-3 text-xs font-semibold text-gray-500 uppercase">Tonnage</th>
+                  <th class="text-right px-3 py-3 text-xs font-semibold text-gray-500 uppercase">Tours</th>
+                  <th class="text-right px-3 py-3 text-xs font-semibold text-gray-500 uppercase">Plafond</th>
+                  <th class="text-right px-3 py-3 text-xs font-semibold text-gray-500 uppercase">Sanctions</th>
+                  <th class="text-right px-3 py-3 text-xs font-semibold text-gray-500 uppercase">Apres sanct.</th>
+                  <th class="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase">Presence</th>
+                  <th class="text-right px-3 py-3 text-xs font-semibold text-red-500 uppercase">Total deduit</th>
+                  <th class="text-right px-3 py-3 text-xs font-semibold text-emerald-600 uppercase">A payer</th>
                   <th class="px-2 py-3"></th>
                 </tr>
               </thead>
@@ -585,62 +633,195 @@ function submit() {
                   v-for="v in vehiculesFiltres"
                   :key="v.immatriculation"
                   class="hover:bg-emerald-50/50 transition-colors cursor-pointer group"
-                  @click="selectionnerVehicule(v)"
+                  @click="ouvrirFicheAgent(v)"
                 >
-                  <td class="px-3 py-3 font-mono font-semibold text-gray-900 text-xs">{{ v.immatriculation }}</td>
-                  <td class="px-3 py-3 font-mono text-xs text-gray-500">{{ v.code_transporteur }}</td>
-                  <td class="px-3 py-3 text-gray-900 text-xs">
+                  <td class="px-3 py-2.5 font-mono font-semibold text-gray-900 text-xs">{{ v.immatriculation }}</td>
+                  <td class="px-3 py-2.5 font-mono text-xs text-gray-500">{{ v.code_transporteur }}</td>
+                  <td class="px-3 py-2.5 text-gray-900 text-xs">
                     {{ v.chauffeur }}
                     <span
                       class="ml-1 inline-flex px-1 py-0.5 rounded text-[9px] font-bold"
                       :class="v.equipe === 'NUIT' ? 'bg-indigo-100 text-indigo-700' : 'bg-amber-100 text-amber-700'"
                     >{{ v.equipe === 'NUIT' ? '🌙' : '☀️' }}</span>
                   </td>
-                  <td class="px-3 py-3 text-right font-mono font-semibold text-gray-900">{{ v.tonnage_tonnes }} t</td>
-                  <td class="px-3 py-3 text-right font-mono text-gray-700">{{ v.rotations }}</td>
-                  <td class="px-3 py-3 text-center">
-                    <span
-                      class="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-bold font-mono"
-                      :class="v.taux_presence >= 93 ? 'text-emerald-700 bg-emerald-50' : v.taux_presence >= 80 ? 'text-amber-700 bg-amber-50' : 'text-red-700 bg-red-50'"
-                    >
+                  <td class="px-3 py-2.5 text-right font-mono font-semibold text-gray-900">{{ v.tonnage_tonnes }} t</td>
+                  <td class="px-3 py-2.5 text-right font-mono text-gray-700">{{ v.rotations }}</td>
+                  <td class="px-3 py-2.5 text-right font-mono text-xs text-gray-400">{{ plafond.toLocaleString() }}</td>
+                  <td class="px-3 py-2.5 text-right font-mono text-xs font-semibold" :class="estimerPrime(v).penalites.total > 0 ? 'text-red-600' : 'text-gray-300'">
+                    {{ estimerPrime(v).penalites.total > 0 ? '-' + estimerPrime(v).penalites.total.toLocaleString() : '0' }}
+                  </td>
+                  <td class="px-3 py-2.5 text-right font-mono text-xs font-semibold text-gray-700">
+                    {{ estimerPrime(v).primeAvant.toLocaleString() }}
+                  </td>
+                  <td class="px-3 py-2.5 text-center">
+                    <span class="font-mono text-xs font-bold px-1.5 py-0.5 rounded"
+                      :class="v.taux_presence >= 93 ? 'text-emerald-700 bg-emerald-50' : v.taux_presence >= 70 ? 'text-amber-700 bg-amber-50' : 'text-red-700 bg-red-50'">
                       {{ v.taux_presence }}%
                     </span>
-                  </td>
-                  <td class="px-3 py-3 text-right">
-                    <span
-                      class="font-mono text-xs font-semibold"
-                      :class="estimerPrime(v).penalites.total > 0 ? 'text-red-600' : 'text-gray-300'"
-                    >
-                      {{ estimerPrime(v).penalites.total > 0 ? '-' : '' }}{{ estimerPrime(v).penalites.total.toLocaleString() }} F
+                    <span v-if="estimerPrime(v).prorata" class="block text-[9px] text-amber-600 font-mono font-semibold mt-0.5">
+                      = {{ Math.round(estimerPrime(v).primeAvant * v.taux_presence / 100).toLocaleString() }} F
                     </span>
                   </td>
-                  <td class="px-3 py-3 text-right">
-                    <span
-                      class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold font-mono"
-                      :class="primeColor(estimerPrime(v).scoreGlobal)"
-                    >
+                  <td class="px-3 py-2.5 text-right">
+                    <span class="font-mono text-xs font-bold text-red-600">
+                      -{{ (plafond - estimerPrime(v).primeFinale).toLocaleString() }} F
+                    </span>
+                  </td>
+                  <td class="px-3 py-2.5 text-right">
+                    <span class="font-mono text-xs font-bold px-2 py-0.5 rounded" :class="primeColor(estimerPrime(v).scoreGlobal)">
                       {{ estimerPrime(v).primeFinale.toLocaleString() }} F
                     </span>
-                    <span v-if="estimerPrime(v).prorata" class="block text-[9px] text-amber-500 font-medium mt-0.5">prorata présence</span>
                   </td>
-                  <td class="px-2 py-3">
+                  <td class="px-2 py-2.5">
                     <ChevronRight class="w-4 h-4 text-gray-300 group-hover:text-emerald-500 transition-colors" />
                   </td>
                 </tr>
                 <tr v-if="vehiculesFiltres.length === 0">
-                  <td colspan="9" class="px-4 py-8 text-center text-gray-400">
-                    Aucun véhicule trouvé pour cette date
+                  <td colspan="12" class="px-4 py-8 text-center text-gray-400">
+                    Aucun vehicule trouve pour cette date
                   </td>
                 </tr>
               </tbody>
             </table>
 
-            <!-- Légende -->
-            <div class="px-4 py-2.5 bg-gray-50 border-t border-gray-100 flex flex-wrap gap-4 text-[11px] text-gray-500">
-              <span>Plafond : <strong class="text-gray-700">{{ plafond.toLocaleString() }} F</strong></span>
-              <span>Presence requise : <strong class="text-gray-700">{{ seuilPresence }}%</strong></span>
-              <span>Seuil min prime : <strong class="text-gray-700">{{ primesStore.config.seuilMinPrime }}%</strong></span>
-              <span class="text-[10px] italic">Pénalités = plafond – (score × plafond)</span>
+          </div>
+        </div>
+
+        <!-- ══ FICHE DÉTAILLÉE AGENT (historique mensuel 21→20) ══ -->
+        <div v-if="ficheAgent" id="fiche-agent-detail" class="bg-white rounded-xl border border-blue-200 overflow-hidden">
+          <!-- Header fiche -->
+          <div class="px-5 py-4 bg-blue-50 border-b border-blue-200 flex items-center justify-between">
+            <div>
+              <h3 class="text-sm font-bold text-blue-900">
+                Fiche Tonnage Mensuel —
+                <span class="font-mono">{{ ficheAgent.code_transporteur }}</span>
+                {{ ficheAgent.chauffeur }}
+              </h3>
+              <p class="text-xs text-blue-600 mt-0.5">
+                Vehicule {{ ficheAgent.immatriculation }} · {{ ficheAgent.equipe === 'NUIT' ? '🌙 Nuit' : '☀️ Jour' }}
+                · Periode {{ bilanMensuel?.periode || '' }}
+              </p>
+            </div>
+            <button @click="fermerFicheAgent" class="p-2 rounded-lg hover:bg-blue-100 transition-colors cursor-pointer">
+              <span class="text-blue-600 text-sm font-bold">✕</span>
+            </button>
+          </div>
+
+          <!-- Résumé prime -->
+          <div class="px-5 py-3 bg-blue-50/30 border-b border-blue-100 flex flex-wrap items-center gap-6 text-xs">
+            <div>
+              <span class="text-gray-500">Plafond</span>
+              <p class="font-mono font-bold text-gray-700">{{ ficheAgent.plafond.toLocaleString() }} F</p>
+            </div>
+            <div class="text-lg text-gray-300">−</div>
+            <div>
+              <span class="text-gray-500">Sanctions cumulees</span>
+              <p class="font-mono font-bold text-red-600">{{ ficheAgent.penalites.total.toLocaleString() }} F</p>
+            </div>
+            <div class="text-lg text-gray-300">=</div>
+            <div>
+              <span class="text-gray-500">Apres sanctions</span>
+              <p class="font-mono font-bold text-gray-700">{{ ficheAgent.prime_avant_presence.toLocaleString() }} F</p>
+            </div>
+            <div v-if="ficheAgent.prorata">
+              <span class="text-gray-500">× Presence {{ ficheAgent.taux_presence }}%</span>
+            </div>
+            <div class="text-lg text-gray-300">=</div>
+            <div>
+              <span class="text-emerald-600 font-semibold">A payer</span>
+              <p class="font-mono font-bold text-emerald-700 text-sm">{{ ficheAgent.prime_finale.toLocaleString() }} F</p>
+            </div>
+            <div class="ml-auto">
+              <span class="text-gray-500">Total deduit</span>
+              <p class="font-mono font-bold text-red-600">-{{ (ficheAgent.plafond - ficheAgent.prime_finale).toLocaleString() }} F</p>
+            </div>
+          </div>
+
+          <!-- Tableau jour par jour -->
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="bg-gray-50 border-b border-gray-100">
+                  <th class="text-center px-3 py-2 text-xs font-semibold text-gray-500">Jour</th>
+                  <th class="text-right px-3 py-2 text-xs font-semibold text-gray-500">Tonnage</th>
+                  <th class="text-right px-3 py-2 text-xs font-semibold text-gray-500">Rotations</th>
+                  <th class="text-right px-3 py-2 text-xs font-semibold text-gray-500">Moyenne</th>
+                  <th class="text-center px-3 py-2 text-xs font-semibold text-gray-500">Score</th>
+                  <th class="text-right px-3 py-2 text-xs font-semibold text-gray-500">Penalite</th>
+                  <th class="text-left px-3 py-2 text-xs font-semibold text-gray-500">Destination</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-50">
+                <tr v-for="j in ficheAgent.detail_jours" :key="j.jour" class="hover:bg-gray-50/50">
+                  <td class="px-3 py-2 text-center font-mono text-xs font-bold text-gray-700">J{{ j.jour }}</td>
+                  <td class="px-3 py-2 text-right font-mono text-xs font-semibold text-gray-900">{{ j.tonnage_tonnes }} t</td>
+                  <td class="px-3 py-2 text-right font-mono text-xs text-gray-700">{{ j.rotations }}</td>
+                  <td class="px-3 py-2 text-right font-mono text-xs text-gray-700">{{ j.moyenne }} t/rot</td>
+                  <td class="px-3 py-2 text-center">
+                    <span class="font-mono text-xs font-bold px-1.5 py-0.5 rounded"
+                      :class="j.score >= 75 ? 'text-emerald-700 bg-emerald-50' : j.score >= 50 ? 'text-amber-700 bg-amber-50' : 'text-red-700 bg-red-50'">
+                      {{ j.score }}%
+                    </span>
+                  </td>
+                  <td class="px-3 py-2 text-right font-mono text-xs" :class="j.penalite > 0 ? 'text-red-600 font-semibold' : 'text-gray-300'">
+                    {{ j.penalite > 0 ? '-' + j.penalite.toLocaleString() + ' F' : '0' }}
+                  </td>
+                  <td class="px-3 py-2 text-xs text-gray-500 truncate max-w-[150px]">{{ j.destination }}</td>
+                </tr>
+              </tbody>
+              <tfoot>
+                <tr class="bg-gray-50 border-t-2 border-gray-200 font-bold text-xs">
+                  <td class="px-3 py-2 text-center text-gray-700">{{ ficheAgent.detail_jours.length }} jours</td>
+                  <td class="px-3 py-2 text-right font-mono text-gray-900">
+                    {{ ficheAgent.detail_jours.reduce((s, j) => s + j.tonnage_tonnes, 0).toFixed(2) }} t
+                  </td>
+                  <td class="px-3 py-2 text-right font-mono text-gray-700">
+                    {{ ficheAgent.detail_jours.reduce((s, j) => s + j.rotations, 0) }}
+                  </td>
+                  <td class="px-3 py-2 text-right font-mono text-gray-700">
+                    {{ ficheAgent.detail_jours.length > 0 ? (ficheAgent.detail_jours.reduce((s, j) => s + j.tonnage_tonnes, 0) / ficheAgent.detail_jours.reduce((s, j) => s + j.rotations, 0)).toFixed(1) : '0' }} t/rot
+                  </td>
+                  <td class="px-3 py-2 text-center">—</td>
+                  <td class="px-3 py-2 text-right font-mono text-red-600">
+                    -{{ ficheAgent.penalites.total.toLocaleString() }} F
+                  </td>
+                  <td class="px-3 py-2"></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <!-- Bouton sélectionner pour passer aux ripeurs -->
+          <div class="px-5 py-3 bg-gray-50 border-t border-gray-100 flex justify-between items-center">
+            <button @click="fermerFicheAgent" class="text-xs text-gray-500 hover:text-gray-700 cursor-pointer">
+              Retour a la liste
+            </button>
+            <BaseButton @click="() => { const v = vehiculesDuJour.find(vv => vv.code_transporteur == ficheAgent?.code_transporteur); ficheAgent = null; if (v) selectionnerVehicule(v) }" variant="primary" type="button">
+              Selectionner ce vehicule
+              <ChevronRight class="w-4 h-4 ml-1.5" />
+            </BaseButton>
+          </div>
+        </div>
+
+        <!-- Résumé global -->
+        <div class="bg-white rounded-xl border border-gray-100 px-4 py-3">
+          <div class="flex flex-wrap items-center gap-6 text-xs">
+            <div>
+              <span class="text-gray-500">Budget total</span>
+              <p class="font-mono font-bold text-gray-700">{{ (vehiculesFiltres.length * plafond).toLocaleString() }} F</p>
+            </div>
+            <div class="text-lg text-gray-300">−</div>
+            <div>
+              <span class="text-gray-500">Total sanctions</span>
+              <p class="font-mono font-bold text-red-600">{{ vehiculesFiltres.reduce((s, v) => s + (v.penalites_mois?.total || 0), 0).toLocaleString() }} F</p>
+            </div>
+            <div class="text-lg text-gray-300">=</div>
+            <div>
+              <span class="text-gray-500">Total a payer</span>
+              <p class="font-mono font-bold text-emerald-700 text-sm">{{ vehiculesFiltres.reduce((s, v) => s + (v.prime_finale ?? 0), 0).toLocaleString() }} F</p>
+            </div>
+            <div class="ml-auto text-right">
+              <span class="text-gray-400">{{ vehiculesFiltres.length }} agents · Plafond {{ plafond.toLocaleString() }} F · Presence {{ seuilPresence }}%</span>
             </div>
           </div>
         </div>
