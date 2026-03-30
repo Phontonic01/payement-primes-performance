@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import DateInput from '@/components/ui/DateInput.vue'
 import { ClipboardCheck, Gauge } from 'lucide-vue-next'
 import { useToastStore } from '@/stores/toast'
 import { useSaisiesStore } from '@/stores/saisies'
@@ -78,7 +79,7 @@ function submitForm() {
         <!-- Identity Fields -->
         <div class="p-6">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <BaseInput v-model="form.date" type="date" label="Date d'evaluation" required />
+            <div class="space-y-1.5"><label class="block text-[13px] font-medium text-gray-600">Date d'evaluation<span class="text-red-400 ml-0.5">*</span></label><DateInput v-model="form.date" required /></div>
 
             <div class="space-y-1.5">
               <label class="block text-sm font-medium text-gray-900">Véhicule du parc <span class="text-red-500">*</span></label>

@@ -4,6 +4,7 @@ import { ClipboardCheck, ShieldCheck, Truck, Save, ArrowLeft, AlertTriangle } fr
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import DateInput from '@/components/ui/DateInput.vue'
 import AgentSearchInput from '@/components/ui/AgentSearchInput.vue'
 import { useToastStore } from '@/stores/toast'
 import { useSaisiesStore } from '@/stores/saisies'
@@ -114,7 +115,7 @@ function submitForm() {
       <form @submit.prevent="submitForm" class="space-y-6">
         <!-- Date & Agent -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <BaseInput v-model="form.date" type="date" label="Date de contrôle" required />
+          <div class="space-y-1.5"><label class="block text-[13px] font-medium text-gray-600">Date de contrôle<span class="text-red-400 ml-0.5">*</span></label><DateInput v-model="form.date" required /></div>
 
           <div>
             <AgentSearchInput

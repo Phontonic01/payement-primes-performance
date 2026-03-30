@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { Factory, Truck, Calendar, RefreshCw, Loader2, WifiOff, Search, ChevronRight, Zap } from 'lucide-vue-next'
 import BaseCard from '@/components/ui/BaseCard.vue'
+import DateInput from '@/components/ui/DateInput.vue'
 import api from '@/api/client'
 import { useToastStore } from '@/stores/toast'
 
@@ -81,7 +82,7 @@ const tonnageTotal = computed(() => vehicules.value.reduce((s, v) => s + (v.tonn
           <p class="text-xs text-gray-500">Données pont-bascule automatiques</p>
         </div>
       </div>
-      <input v-model="date" type="date" class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors" />
+      <DateInput v-model="date" />
       <button @click="charger" class="flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-orange-700 bg-orange-50 border border-orange-200 rounded-xl hover:bg-orange-100 transition-colors cursor-pointer">
         <RefreshCw class="w-4 h-4" /> Actualiser
       </button>

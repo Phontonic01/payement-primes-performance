@@ -57,10 +57,16 @@ export const usePontBasculeStore = defineStore('pontBascule', () => {
     return bilanMap.value[codeTransporteur] || null
   }
 
-  // ── Obtenir le bilan d'un chauffeur par matricule agent local ──
-  // (cherche dans les bilans si le nom correspond)
-  function getBilanParNom(nom) {
-    if (!bilan.value?.chauffeurs || !nom) return null
+  // ── Obtenir le bilan d'un chauffeur par matricule RH ou par nom ──
+  function getBilanParNom(nom, matricule = null) {
+    if (!bilan.value?.chauffeurs) return null
+    // Priorité 1 : chercher par matricule RH (= code_transporteur converti)
+    if (matricule) {
+      const found = bilan.value.chauffeurs.find(c => String(c.code_transporteur) === String(matricule))
+      if (found) return found
+    }
+    // Priorité 2 : chercher par nom
+    if (!nom) return null
     const nomLower = nom.toLowerCase()
     return bilan.value.chauffeurs.find(c =>
       c.chauffeur.toLowerCase().includes(nomLower) ||

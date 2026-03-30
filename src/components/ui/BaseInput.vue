@@ -36,6 +36,7 @@ const inputId = computed(() => props.id || 'input-' + props.label.toLowerCase().
       :step="step"
       :disabled="disabled"
       :aria-required="required || undefined"
+      :lang="type === 'date' ? 'fr-FR' : undefined"
       @input="emit('update:modelValue', $event.target.value)"
       class="block w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400
              shadow-sm shadow-gray-900/[0.02]

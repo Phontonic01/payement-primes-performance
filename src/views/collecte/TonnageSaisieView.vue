@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import DateInput from '@/components/ui/DateInput.vue'
 import AgentSearchInput from '@/components/ui/AgentSearchInput.vue'
 import {
   Truck, Weight, RotateCcw, Calendar, User, Gauge, Hash, Users, MapPin,
@@ -163,15 +164,18 @@ const vehiculesFiltres = computed(() => {
     list = list.filter(v => v.equipe === filtreEquipe.value)
   }
 
-  // Filtre par recherche texte
+  // Filtre par recherche texte (N° parc, nom, matricule RH)
   if (searchQuery.value) {
-    const q = searchQuery.value.toLowerCase()
-    list = list.filter(v =>
-      v.immatriculation.toLowerCase().includes(q) ||
-      v.chauffeur.toLowerCase().includes(q) ||
-      v.arrondissement.toLowerCase().includes(q) ||
-      v.code_transporteur.toString().includes(q)
-    )
+    const q = searchQuery.value.toLowerCase().trim()
+    list = list.filter(v => {
+      const matricule = String(v.code_transporteur || '')
+      const matriculePad = matricule.padStart(4, '0')
+      return v.immatriculation.toLowerCase().includes(q) ||
+        v.chauffeur.toLowerCase().includes(q) ||
+        v.arrondissement.toLowerCase().includes(q) ||
+        matricule.includes(q) ||
+        matriculePad.includes(q)
+    })
   }
 
   return list
@@ -186,40 +190,8 @@ const ficheAgent = ref(null)
 const ficheLoading = ref(false)
 
 function ouvrirFicheAgent(v) {
-  // Chercher dans le bilan mensuel (chargé en parallèle avec vehicules du jour)
-  const bilan = bilanMensuel.value
-  const code = String(v.code_transporteur)
-
-  if (bilan?.chauffeurs) {
-    const agent = bilan.chauffeurs.find(c => String(c.code_transporteur) === code)
-    if (agent) {
-      ficheAgent.value = { ...agent, immatriculation: v.immatriculation }
-      // Scroll vers la fiche
-      setTimeout(() => {
-        document.getElementById('fiche-agent-detail')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      }, 100)
-      return
-    }
-  }
-
-  // Fallback : afficher au moins les données du jour
-  ficheAgent.value = {
-    code_transporteur: v.code_transporteur,
-    chauffeur: v.chauffeur,
-    immatriculation: v.immatriculation,
-    equipe: v.equipe,
-    jours_present: v.jours_present || 0,
-    taux_presence: v.taux_presence || 0,
-    plafond: plafond.value,
-    penalites: v.penalites_mois || { tonnage: 0, bouclage: 0, entretien: 0, qhse: 0, total: 0 },
-    prime_avant_presence: plafond.value - (v.penalites_mois?.total || 0),
-    prime_finale: v.prime_finale ?? plafond.value,
-    prorata: v.prorata || false,
-    detail_jours: v.bilan?.detail_jours || [],
-  }
-  setTimeout(() => {
-    document.getElementById('fiche-agent-detail')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }, 100)
+  // Naviguer vers la page dédiée de l'agent
+  router.push({ name: 'fiche-agent', params: { matricule: v.code_transporteur } })
 }
 
 function fermerFicheAgent() {
@@ -412,12 +384,7 @@ function submit() {
           <p class="text-xs text-gray-500">Les données pont-bascule sont chargées automatiquement</p>
         </div>
       </div>
-      <input
-        v-model="date"
-        type="date"
-        required
-        class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-colors duration-200"
-      />
+      <DateInput v-model="date" required />
       <button
         type="button"
         @click="chargerVehiculesDuJour"

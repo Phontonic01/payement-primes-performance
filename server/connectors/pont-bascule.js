@@ -11,6 +11,39 @@
  */
 
 import sql from 'mssql'
+import { db as localDb } from '../db.js'
+
+// ═══ Mapping pont-bascule → matricule RH ═══
+
+let mappingCache = null
+
+function loadMapping() {
+  if (mappingCache) return mappingCache
+  try {
+    const rows = localDb.prepare('SELECT code_transporteur, matricule_rh FROM pont_bascule_mapping').all()
+    mappingCache = {}
+    for (const r of rows) { mappingCache[r.code_transporteur] = r.matricule_rh }
+    console.log(`  ✓ Mapping pont-bascule chargé (${rows.length} entrées)`)
+  } catch {
+    mappingCache = {}
+  }
+  return mappingCache
+}
+
+function convertMatricule(codeTransporteur, mapping) {
+  return mapping[String(codeTransporteur)] || codeTransporteur
+}
+
+function applyMapping(records) {
+  const mapping = loadMapping()
+  return records
+    .filter(r => mapping[String(r.Code_Transporteur)] !== undefined)
+    .map(r => ({
+      ...r,
+      Code_Transporteur_Original: r.Code_Transporteur,
+      Code_Transporteur: mapping[String(r.Code_Transporteur)],
+    }))
+}
 
 // ═══ Configuration ═══
 
@@ -168,8 +201,8 @@ async function getPesees(date) {
       WHERE Annee = @annee AND Mois = @mois AND Jour = @jour
       ORDER BY No_Pesee_Entree DESC
     `)
-  // Enrichir avec l'équipe
-  return result.recordset.map(r => ({
+  // Enrichir avec l'équipe + conversion matricule
+  return applyMapping(result.recordset).map(r => ({
     ...r,
     Equipe: determinerEquipe(r.Heure_Entree),
   }))
@@ -190,7 +223,7 @@ async function getPeseesParMois(mois) {
       WHERE Annee = @annee AND Mois = @mois
       ORDER BY No_Pesee_Entree DESC
     `)
-  return result.recordset
+  return applyMapping(result.recordset)
 }
 
 /**
@@ -210,7 +243,7 @@ async function getPeseesParVehicule(immatriculation, mois) {
         AND Annee = @annee AND Mois = @mois
       ORDER BY No_Pesee_Entree DESC
     `)
-  return result.recordset
+  return applyMapping(result.recordset)
 }
 
 /**
@@ -230,7 +263,7 @@ async function getPeseesParTransporteur(transporteur, mois) {
         AND Annee = @annee AND Mois = @mois
       ORDER BY No_Pesee_Entree DESC
     `)
-  return result.recordset
+  return applyMapping(result.recordset)
 }
 
 /**
@@ -330,8 +363,9 @@ async function getBilanMensuel(mois, client = 'CLEAN AFRICA', plafondParam = nul
 
   // Déterminer l'équipe dominante de chaque chauffeur (JOUR ou NUIT)
   // puis ne compter que les pesées de cette équipe
+  const mappedRecords = applyMapping(result.recordset)
   const chauffeursPesees = {}
-  for (const row of result.recordset) {
+  for (const row of mappedRecords) {
     const code = row.Code_Transporteur
     if (!chauffeursPesees[code]) chauffeursPesees[code] = []
     chauffeursPesees[code].push(row)
@@ -484,8 +518,10 @@ async function getPresenceMensuelle(mois, client = 'CLEAN AFRICA') {
       GROUP BY Code_Transporteur, Libelle_Transporteur
       ORDER BY jours_present DESC
     `)
+  const mapping = loadMapping()
   return result.recordset.map(r => ({
-    code_transporteur: r.Code_Transporteur,
+    code_transporteur: convertMatricule(r.Code_Transporteur, mapping),
+    code_transporteur_original: r.Code_Transporteur,
     chauffeur: r.Libelle_Transporteur,
     jours_present: r.jours_present,
   }))
@@ -494,16 +530,16 @@ async function getPresenceMensuelle(mois, client = 'CLEAN AFRICA') {
 /**
  * Synchroniser les pesées du pont-bascule vers la base locale SQLite
  */
-async function syncPesees(localDb, date) {
+async function syncPesees(syncDb, date) {
   const pesees = await getPesees(date)
 
-  const insert = localDb.prepare(`
+  const insert = syncDb.prepare(`
     INSERT OR REPLACE INTO tonnages
     (matricule, date, agent_nom, vehicule, vehicule_type, no_parc, immatriculation, tonnage, rotations, updated_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
   `)
 
-  const tx = localDb.transaction((list) => {
+  const tx = syncDb.transaction((list) => {
     for (const pesee of list) {
       insert.run(
         pesee.Code_Transporteur || '',
@@ -570,5 +606,6 @@ export {
   syncPesees,
   diagnostic,
   determinerEquipe,
+  loadMapping,
   CONFIG,
 }

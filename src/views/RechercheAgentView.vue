@@ -1,6 +1,7 @@
 <script setup>
-import { ref, computed, watch } from 'vue'
-import { Search, Calendar, User, Hash, MapPin, Truck, ShieldCheck, Wrench, TrendingUp, CheckCircle, XCircle, Clock, AlertTriangle, ArrowDown, Download, Zap } from 'lucide-vue-next'
+import { ref, computed, watch, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { Search, Calendar, User, Hash, MapPin, Truck, ShieldCheck, Wrench, TrendingUp, CheckCircle, XCircle, Clock, AlertTriangle, ArrowDown, Download, Zap, ArrowLeft } from 'lucide-vue-next'
 import { generateFicheAgentPdf } from '@/utils/generatePdf'
 import { formatDateFr } from '@/utils/formatDate'
 import { useAgentsStore } from '@/stores/agents'
@@ -9,7 +10,10 @@ import { usePontBasculeStore } from '@/stores/pontBascule'
 import { useSaisiesStore } from '@/stores/saisies'
 import AgentSearchInput from '@/components/ui/AgentSearchInput.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
+import DateInput from '@/components/ui/DateInput.vue'
 
+const route = useRoute()
+const router = useRouter()
 const agentsStore = useAgentsStore()
 const primesStore = usePrimesStore()
 const pontBasculeStore = usePontBasculeStore()
@@ -18,6 +22,19 @@ const saisiesStore = useSaisiesStore()
 const selectedMatricule = ref('')
 const selectedDate = ref(new Date().toISOString().split('T')[0])
 const selectedAgent = ref(null)
+
+// Si on arrive via /agent/:matricule, charger l'agent automatiquement
+onMounted(async () => {
+  const mat = route.params.matricule
+  if (mat) {
+    await agentsStore.ensureLoaded()
+    const agent = agentsStore.agents.find(a => a.matricule === mat)
+    if (agent) {
+      selectedMatricule.value = mat
+      selectedAgent.value = agent
+    }
+  }
+})
 
 function onAgentSelected(agent) {
   selectedAgent.value = agent
@@ -34,10 +51,10 @@ watch(moisSelectionne, (mois) => {
   if (mois) pontBasculeStore.chargerBilan(mois)
 }, { immediate: true })
 
-// Bilan pont-bascule pour l'agent sélectionné (par nom)
+// Bilan pont-bascule pour l'agent sélectionné (par matricule RH puis par nom)
 const bilanAgent = computed(() => {
   if (!selectedAgent.value) return null
-  return pontBasculeStore.getBilanParNom(selectedAgent.value.nom)
+  return pontBasculeStore.getBilanParNom(selectedAgent.value.nom, selectedAgent.value.matricule)
 })
 
 // Présence depuis le pont-bascule (automatique)
@@ -162,10 +179,20 @@ function scoreBarColor(score) {
 
 <template>
   <div class="space-y-6">
+    <!-- Bouton retour si arrivé via /agent/:matricule -->
+    <button
+      v-if="route.params.matricule"
+      @click="router.back()"
+      class="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition-colors cursor-pointer"
+    >
+      <ArrowLeft class="w-4 h-4" />
+      Retour
+    </button>
+
     <!-- Header -->
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
       <div>
-        <h1 class="text-2xl font-bold text-gray-900">Recherche Agent</h1>
+        <h1 class="text-2xl font-bold text-gray-900">{{ route.params.matricule ? 'Fiche Agent' : 'Recherche Agent' }}</h1>
         <p class="text-sm text-gray-500 mt-0.5">Consultation des performances et primes par matricule ou nom</p>
       </div>
       <div class="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-xl">
@@ -191,11 +218,7 @@ function scoreBarColor(score) {
             <Calendar class="w-3.5 h-3.5 text-gray-400" />
             Date de consultation
           </label>
-          <input
-            v-model="selectedDate"
-            type="date"
-            class="block w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-colors duration-200"
-          />
+          <DateInput v-model="selectedDate" />
         </div>
       </div>
     </div>
@@ -458,17 +481,172 @@ function scoreBarColor(score) {
           </div>
         </div>
       </div>
+
+      <!-- ══ HISTORIQUE JOURNALIER PONT-BASCULE ══ -->
+      <div v-if="fiche.detailJours && fiche.detailJours.length > 0" class="bg-white rounded-xl border border-gray-100 overflow-hidden">
+        <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div>
+            <h3 class="text-sm font-bold text-gray-900">Historique journalier — Pont-bascule</h3>
+            <p class="text-xs text-gray-500 mt-0.5">
+              Periode {{ bilanAgent?.periode || pontBasculeStore.bilan?.periode || '' }}
+              · {{ fiche.detailJours.length }} jour(s) travaille(s)
+              · {{ fiche.equipe === 'NUIT' ? '🌙 Nuit' : '☀️ Jour' }}
+            </p>
+          </div>
+          <div class="flex items-center gap-3 text-xs">
+            <span class="font-mono font-bold text-gray-700 bg-gray-100 px-2 py-1 rounded">
+              {{ fiche.detailJours.reduce((s, j) => s + j.tonnage_tonnes, 0).toFixed(2) }} t total
+            </span>
+            <span class="font-mono font-bold text-gray-700 bg-gray-100 px-2 py-1 rounded">
+              {{ fiche.detailJours.reduce((s, j) => s + j.rotations, 0) }} rotations
+            </span>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="bg-gray-50 border-b border-gray-100">
+                <th class="text-center px-3 py-2.5 text-xs font-semibold text-gray-500">Jour</th>
+                <th class="text-right px-3 py-2.5 text-xs font-semibold text-gray-500">Tonnage</th>
+                <th class="text-right px-3 py-2.5 text-xs font-semibold text-gray-500">Rotations</th>
+                <th class="text-right px-3 py-2.5 text-xs font-semibold text-gray-500">Moyenne</th>
+                <th class="text-center px-3 py-2.5 text-xs font-semibold text-gray-500">Score</th>
+                <th class="text-right px-3 py-2.5 text-xs font-semibold text-gray-500">Penalite</th>
+                <th class="text-left px-3 py-2.5 text-xs font-semibold text-gray-500">Destination</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-50">
+              <tr v-for="j in fiche.detailJours" :key="j.jour" class="hover:bg-gray-50/50">
+                <td class="px-3 py-2 text-center font-mono text-xs font-bold text-gray-700">J{{ j.jour }}</td>
+                <td class="px-3 py-2 text-right font-mono text-xs font-semibold text-gray-900">{{ j.tonnage_tonnes }} t</td>
+                <td class="px-3 py-2 text-right font-mono text-xs text-gray-700">{{ j.rotations }}</td>
+                <td class="px-3 py-2 text-right font-mono text-xs text-gray-700">{{ j.moyenne }} t/rot</td>
+                <td class="px-3 py-2 text-center">
+                  <span class="font-mono text-xs font-bold px-1.5 py-0.5 rounded"
+                    :class="j.score >= 75 ? 'text-emerald-700 bg-emerald-50' : j.score >= 50 ? 'text-amber-700 bg-amber-50' : 'text-red-700 bg-red-50'">
+                    {{ j.score }}%
+                  </span>
+                </td>
+                <td class="px-3 py-2 text-right font-mono text-xs" :class="j.penalite > 0 ? 'text-red-600 font-semibold' : 'text-gray-300'">
+                  {{ j.penalite > 0 ? '-' + j.penalite.toLocaleString() + ' F' : '0' }}
+                </td>
+                <td class="px-3 py-2 text-xs text-gray-500 truncate max-w-[200px]">{{ j.destination }}</td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr class="bg-gray-50 border-t-2 border-gray-200 font-bold text-xs">
+                <td class="px-3 py-2.5 text-center text-gray-700">{{ fiche.detailJours.length }} jours</td>
+                <td class="px-3 py-2.5 text-right font-mono text-gray-900">
+                  {{ fiche.detailJours.reduce((s, j) => s + j.tonnage_tonnes, 0).toFixed(2) }} t
+                </td>
+                <td class="px-3 py-2.5 text-right font-mono text-gray-700">
+                  {{ fiche.detailJours.reduce((s, j) => s + j.rotations, 0) }}
+                </td>
+                <td class="px-3 py-2.5 text-right font-mono text-gray-700">
+                  {{ fiche.detailJours.length > 0 ? (fiche.detailJours.reduce((s, j) => s + j.tonnage_tonnes, 0) / fiche.detailJours.reduce((s, j) => s + j.rotations, 0)).toFixed(1) : '0' }} t/rot
+                </td>
+                <td class="px-3 py-2.5 text-center">—</td>
+                <td class="px-3 py-2.5 text-right font-mono text-red-600">
+                  -{{ fiche.penalites.total.toLocaleString() }} F
+                </td>
+                <td class="px-3 py-2.5"></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
     </template>
 
-    <!-- Agent sélectionné mais pas de saisies -->
+    <!-- Agent sélectionné mais pas de saisies — afficher quand même les données pont-bascule si disponibles -->
+    <template v-else-if="selectedAgent && !fiche && bilanAgent">
+      <!-- Profil Agent minimal -->
+      <div class="bg-white rounded-xl border border-gray-100 p-6">
+        <div class="flex items-center gap-4">
+          <div class="w-14 h-14 rounded-2xl bg-emerald-600 flex items-center justify-center text-white text-xl font-bold flex-shrink-0">
+            {{ selectedAgent.nom.charAt(0) }}
+          </div>
+          <div>
+            <h2 class="text-xl font-bold text-gray-900">{{ selectedAgent.nom }}</h2>
+            <div class="flex items-center gap-3 mt-1 text-sm text-gray-500">
+              <span class="flex items-center gap-1"><Hash class="w-3.5 h-3.5" /> {{ selectedAgent.matricule }}</span>
+              <span class="text-gray-300">|</span>
+              <span class="flex items-center gap-1"><User class="w-3.5 h-3.5" /> {{ selectedAgent.role }}</span>
+              <span class="text-gray-300">|</span>
+              <span>{{ bilanAgent.equipe === 'NUIT' ? '🌙 Nuit' : '☀️ Jour' }}</span>
+              <span class="text-gray-300">|</span>
+              <span>Presence: {{ bilanAgent.taux_presence }}%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Historique journalier pont-bascule (sans les axes de sanction) -->
+      <div v-if="bilanAgent.detail_jours && bilanAgent.detail_jours.length > 0" class="bg-white rounded-xl border border-gray-100 overflow-hidden">
+        <div class="px-5 py-4 border-b border-gray-100">
+          <h3 class="text-sm font-bold text-gray-900">Historique journalier — Pont-bascule</h3>
+          <p class="text-xs text-gray-500 mt-0.5">{{ bilanAgent.detail_jours.length }} jour(s) travaille(s) · Les services n'ont pas encore saisi les sanctions</p>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="bg-gray-50 border-b border-gray-100">
+                <th class="text-center px-3 py-2.5 text-xs font-semibold text-gray-500">Jour</th>
+                <th class="text-right px-3 py-2.5 text-xs font-semibold text-gray-500">Tonnage</th>
+                <th class="text-right px-3 py-2.5 text-xs font-semibold text-gray-500">Rotations</th>
+                <th class="text-right px-3 py-2.5 text-xs font-semibold text-gray-500">Moyenne</th>
+                <th class="text-center px-3 py-2.5 text-xs font-semibold text-gray-500">Score</th>
+                <th class="text-right px-3 py-2.5 text-xs font-semibold text-gray-500">Penalite tonnage</th>
+                <th class="text-left px-3 py-2.5 text-xs font-semibold text-gray-500">Destination</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-50">
+              <tr v-for="j in bilanAgent.detail_jours" :key="j.jour" class="hover:bg-gray-50/50">
+                <td class="px-3 py-2 text-center font-mono text-xs font-bold text-gray-700">J{{ j.jour }}</td>
+                <td class="px-3 py-2 text-right font-mono text-xs font-semibold text-gray-900">{{ j.tonnage_tonnes }} t</td>
+                <td class="px-3 py-2 text-right font-mono text-xs text-gray-700">{{ j.rotations }}</td>
+                <td class="px-3 py-2 text-right font-mono text-xs text-gray-700">{{ j.moyenne }} t/rot</td>
+                <td class="px-3 py-2 text-center">
+                  <span class="font-mono text-xs font-bold px-1.5 py-0.5 rounded"
+                    :class="j.score >= 75 ? 'text-emerald-700 bg-emerald-50' : j.score >= 50 ? 'text-amber-700 bg-amber-50' : 'text-red-700 bg-red-50'">
+                    {{ j.score }}%
+                  </span>
+                </td>
+                <td class="px-3 py-2 text-right font-mono text-xs" :class="j.penalite > 0 ? 'text-red-600 font-semibold' : 'text-gray-300'">
+                  {{ j.penalite > 0 ? '-' + j.penalite.toLocaleString() + ' F' : '0' }}
+                </td>
+                <td class="px-3 py-2 text-xs text-gray-500 truncate max-w-[200px]">{{ j.destination }}</td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr class="bg-gray-50 border-t-2 border-gray-200 font-bold text-xs">
+                <td class="px-3 py-2.5 text-center text-gray-700">{{ bilanAgent.detail_jours.length }} j</td>
+                <td class="px-3 py-2.5 text-right font-mono text-gray-900">
+                  {{ bilanAgent.detail_jours.reduce((s, j) => s + j.tonnage_tonnes, 0).toFixed(2) }} t
+                </td>
+                <td class="px-3 py-2.5 text-right font-mono text-gray-700">
+                  {{ bilanAgent.detail_jours.reduce((s, j) => s + j.rotations, 0) }}
+                </td>
+                <td class="px-3 py-2.5 text-right font-mono text-gray-700">—</td>
+                <td class="px-3 py-2.5 text-center">—</td>
+                <td class="px-3 py-2.5 text-right font-mono text-red-600">
+                  -{{ bilanAgent.penalites.total.toLocaleString() }} F
+                </td>
+                <td class="px-3 py-2.5"></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </template>
+
+    <!-- Agent sélectionné, aucune donnée nulle part -->
     <div v-else-if="selectedAgent && !fiche" class="bg-white rounded-xl border border-gray-100 p-12 text-center">
       <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-amber-50 mb-4">
         <AlertTriangle class="w-8 h-8 text-amber-400" />
       </div>
-      <h3 class="text-lg font-semibold text-gray-900">Aucune saisie pour cet agent</h3>
+      <h3 class="text-lg font-semibold text-gray-900">Aucune donnee pour cet agent</h3>
       <p class="text-sm text-gray-500 mt-1 max-w-md mx-auto">
-        Aucune donnée de performance n'a été saisie pour <strong>{{ selectedAgent.nom }}</strong> sur le mois sélectionné.
-        Les services doivent d'abord saisir le tonnage, bouclage, entretien et QHSE.
+        Aucune donnee de performance n'a ete trouvee pour <strong>{{ selectedAgent.nom }}</strong> sur le mois selectionne.
       </p>
     </div>
 

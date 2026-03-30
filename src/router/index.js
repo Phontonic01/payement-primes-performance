@@ -27,6 +27,12 @@ const router = createRouter({
       component: () => import('@/views/RechercheAgentView.vue'),
       meta: { requiresAuth: true, layout: 'DashboardLayout', title: 'Recherche Agent', breadcrumb: ['Recherche Agent'] }
     },
+    {
+      path: '/agent/:matricule',
+      name: 'fiche-agent',
+      component: () => import('@/views/RechercheAgentView.vue'),
+      meta: { requiresAuth: true, layout: 'DashboardLayout', title: 'Fiche Agent', breadcrumb: ['Fiche Agent'] }
+    },
     // Collecte
     {
       path: '/collecte/tonnage',

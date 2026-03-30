@@ -8,6 +8,7 @@ import { useConfirmStore } from '@/stores/confirm'
 import { useSaisiesStore } from '@/stores/saisies'
 import { useAuthStore } from '@/stores/auth'
 import ReadOnlyBanner from '@/components/ui/ReadOnlyBanner.vue'
+import DateInput from '@/components/ui/DateInput.vue'
 import api from '@/api/client'
 
 const toastStore = useToastStore()
@@ -125,11 +126,7 @@ async function annulerDeclaration(v) {
         </div>
         <div class="flex items-center gap-2 ml-auto">
           <Calendar class="w-4 h-4 text-gray-400" />
-          <input
-            type="date"
-            v-model="dateFiltre"
-            class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-colors"
-          />
+          <DateInput v-model="dateFiltre" />
           <button @click="chargerDonnees" class="p-2 rounded-xl bg-gray-100 hover:bg-gray-200 transition-colors cursor-pointer">
             <RefreshCw class="w-4 h-4 text-gray-600" />
           </button>

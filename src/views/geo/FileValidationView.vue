@@ -2,6 +2,7 @@
 import { computed, ref, onMounted, watch } from 'vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import DateInput from '@/components/ui/DateInput.vue'
 import { Eye, MapPin, Clock, CheckCircle, Search, Calendar, Truck, Hash, Users, Loader2 } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 import { useSaisiesStore } from '@/stores/saisies'
@@ -99,8 +100,7 @@ function voirDetails(v) {
     <div class="bg-white rounded-xl border border-gray-100 p-4 flex flex-col sm:flex-row gap-3">
       <div class="flex items-center gap-2">
         <Calendar class="w-4 h-4 text-gray-400" />
-        <input type="date" v-model="dateFiltre"
-          class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-colors" />
+        <DateInput v-model="dateFiltre" />
       </div>
       <div class="relative flex-1">
         <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />

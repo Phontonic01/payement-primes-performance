@@ -3,6 +3,7 @@ import { ref, watch } from 'vue'
 import { AlertTriangle, Lock, Unlock, FileText, Eye } from 'lucide-vue-next'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import DateInput from '@/components/ui/DateInput.vue'
 import { useToastStore } from '@/stores/toast'
 import { usePrimesStore } from '@/stores/primes'
 
@@ -125,11 +126,7 @@ const unlockedClass = 'bg-white border border-amber-300 text-gray-900 focus:outl
             </div>
             <div class="space-y-1">
               <label class="text-[11px] font-medium text-gray-400 uppercase tracking-wider">Date</label>
-              <input
-                v-model="noteDeServiceDate"
-                type="date"
-                class="block w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10 outline-none"
-              />
+              <DateInput v-model="noteDeServiceDate" />
             </div>
           </div>
           <BaseButton @click="activerNoteDeService" variant="outline" size="sm">

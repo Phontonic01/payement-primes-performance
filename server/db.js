@@ -216,6 +216,15 @@ const SCHEMA = `
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
+  CREATE TABLE IF NOT EXISTS pont_bascule_mapping (
+    code_transporteur TEXT PRIMARY KEY,
+    matricule_rh TEXT NOT NULL,
+    nom_pont_bascule TEXT DEFAULT '',
+    nom_rh TEXT DEFAULT '',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_pb_mapping_matricule ON pont_bascule_mapping(matricule_rh);
   CREATE INDEX IF NOT EXISTS idx_agents_matricule ON agents(matricule);
   CREATE INDEX IF NOT EXISTS idx_agents_service ON agents(service);
   CREATE INDEX IF NOT EXISTS idx_tonnages_date ON tonnages(date);
@@ -288,5 +297,28 @@ function seedUsers(bcrypt) {
   console.log('  ✓ Seeded default users')
 }
 
-export { db, seedAgents, seedUsers }
+// ═══ Seed pont-bascule mapping ═══
+
+function seedPontBasculeMapping() {
+  const count = db.prepare('SELECT COUNT(*) as n FROM pont_bascule_mapping').get().n
+  if (count > 0) return
+
+  const dataPath = join(__dirname, '..', 'src', 'data', 'pont-bascule-mapping.json')
+  try {
+    const mapping = JSON.parse(readFileSync(dataPath, 'utf8'))
+
+    const insert = db.prepare(`
+      INSERT OR REPLACE INTO pont_bascule_mapping (code_transporteur, matricule_rh, nom_pont_bascule, nom_rh)
+      VALUES (@code_transporteur, @matricule_rh, @nom_pont_bascule, @nom_rh)
+    `)
+
+    const tx = db.transaction((list) => { for (const m of list) insert.run(m) })
+    tx(mapping)
+    console.log(`  ✓ Seeded ${mapping.length} pont-bascule mappings`)
+  } catch (err) {
+    console.error(`  ✗ Erreur seed pont-bascule mapping: ${err.message}`)
+  }
+}
+
+export { db, seedAgents, seedUsers, seedPontBasculeMapping }
 export default db

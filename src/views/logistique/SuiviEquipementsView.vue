@@ -5,6 +5,7 @@ import BaseTable from '@/components/ui/BaseTable.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import AgentSearchInput from '@/components/ui/AgentSearchInput.vue'
+import DateInput from '@/components/ui/DateInput.vue'
 import { Truck, AlertTriangle, XCircle, ClipboardCheck, Save, CheckCircle, X } from 'lucide-vue-next'
 import { useToastStore } from '@/stores/toast'
 import { useVehiculesStore } from '@/stores/vehicules'
@@ -200,11 +201,7 @@ const historiqueRestitutions = ref([])
           />
           <div class="space-y-1.5">
             <label class="block text-sm font-medium text-gray-700">Date</label>
-            <input
-              v-model="restitutionForm.date"
-              type="date"
-              class="block w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none"
-            />
+            <DateInput v-model="restitutionForm.date" />
           </div>
         </div>
 

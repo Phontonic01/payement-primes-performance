@@ -1,17 +1,23 @@
 import 'dotenv/config'
+import { fileURLToPath } from 'node:url'
+import { dirname, join } from 'node:path'
+import { existsSync } from 'node:fs'
 import express from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
 import compression from 'compression'
 import bcrypt from 'bcryptjs'
 
-import { db, seedAgents, seedUsers } from './db.js'
+import { db, seedAgents, seedUsers, seedPontBasculeMapping } from './db.js'
 import authRoutes from './routes/auth.js'
 import agentsRoutes from './routes/agents.js'
 import saisiesRoutes from './routes/saisies.js'
 import geoRoutes from './routes/geo.js'
 import configRoutes from './routes/config.js'
 import pontBasculeRoutes from './routes/pont-bascule.js'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const DIST_DIR = join(__dirname, '..', 'dist')
 
 const app = express()
 const PORT = process.env.API_PORT || 3001
@@ -55,6 +61,19 @@ app.get('/api/health', (req, res) => {
   })
 })
 
+// ═══ Servir le frontend buildé (production) ═══
+if (existsSync(DIST_DIR)) {
+  app.use(express.static(DIST_DIR))
+  app.get('/{*path}', (req, res) => {
+    if (!req.path.startsWith('/api/')) {
+      res.sendFile(join(DIST_DIR, 'index.html'))
+    }
+  })
+  console.log('  ✓ Frontend servi depuis dist/')
+} else {
+  console.log('  ⚠ Pas de dossier dist/ — lancez "npm run build" pour la production')
+}
+
 // ═══ Error handler ═══
 app.use((err, req, res, next) => {
   console.error('API Error:', err.message)
@@ -69,6 +88,7 @@ console.log('╚═════════════════════�
 console.log('Initialisation de la base de données...')
 seedAgents()
 seedUsers(bcrypt)
+seedPontBasculeMapping()
 
 app.listen(PORT, () => {
   console.log(`\n  ✓ API démarrée sur http://localhost:${PORT}`)

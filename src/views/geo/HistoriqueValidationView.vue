@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseTable from '@/components/ui/BaseTable.vue'
+import DateInput from '@/components/ui/DateInput.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import TableSkeleton from '@/components/ui/TableSkeleton.vue'
@@ -125,11 +126,7 @@ async function sauvegarderModification() {
           <Filter class="w-4 h-4" />
           <span class="font-medium">Filtres</span>
         </div>
-        <input
-          v-model="dateFilter"
-          type="date"
-          class="text-sm bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2 text-gray-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all duration-150"
-        />
+        <DateInput v-model="dateFilter" />
         <select
           v-model="statutFilter"
           class="text-sm bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2 text-gray-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all duration-150"

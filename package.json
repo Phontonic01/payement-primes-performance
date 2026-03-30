@@ -9,7 +9,8 @@
     "dev:front": "vite --host",
     "build": "vite build",
     "preview": "vite preview",
-    "start": "node server/index.js"
+    "start": "node server/index.js",
+    "prod": "npm run build && node server/index.js"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.2.1",
@@ -36,10 +37,9 @@
     "@vitejs/plugin-vue": "^6.0.5",
     "autoprefixer": "^10.4.27",
     "postcss": "^8.5.8",
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4",
     "tailwindcss": "^4.2.1",
     "vite": "^8.0.0",
-    "vite-plugin-vue-devtools": "^8.1.0"
+    "vite-plugin-vue-devtools": "^8.1.0",
+    "xlsx": "^0.18.5"
   }
 }

@@ -7,6 +7,7 @@ import {
 } from 'lucide-vue-next'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import DateInput from '@/components/ui/DateInput.vue'
 import AgentSearchInput from '@/components/ui/AgentSearchInput.vue'
 import ReadOnlyBanner from '@/components/ui/ReadOnlyBanner.vue'
 import { useToastStore } from '@/stores/toast'
@@ -304,12 +305,7 @@ async function submit() {
           <p class="text-xs text-gray-500">Données pont-bascule chargées automatiquement pour le TRI</p>
         </div>
       </div>
-      <input
-        v-model="date"
-        type="date"
-        required
-        class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-colors duration-200"
-      />
+      <DateInput v-model="date" required />
       <button
         type="button"
         @click="chargerVehiculesDuJour"
