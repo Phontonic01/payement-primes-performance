@@ -99,9 +99,11 @@ export const api = {
   },
   createTriSaisie: (data) => request('/saisies/tri', { method: 'POST', body: JSON.stringify(data) }),
 
-  // ═══ Historique équipages véhicule ═══
+  // ═══ Historique équipages ═══
   getHistoriqueVehicule: (immatriculation) =>
     request(`/saisies/historique-vehicule/${encodeURIComponent(immatriculation)}`),
+  getHistoriqueAgent: (matricule) =>
+    request(`/saisies/historique-agent/${encodeURIComponent(matricule)}`),
 
   // ═══ Équipes véhicule ═══
   getEquipeVehicule: (immatriculation, service) => {

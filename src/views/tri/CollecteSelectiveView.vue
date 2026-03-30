@@ -144,10 +144,34 @@ const historiqueBilan = ref([])
 const historiqueLoading = ref(false)
 const historiqueOuvert = ref(false)
 
+// ── Historique agent (ripeur) ──
+const historiqueAgent = ref(null)
+const historiqueAgentLoading = ref(false)
+
+async function voirHistoriqueAgent(agent) {
+  if (!agent) return
+  if (historiqueAgent.value?.matricule === agent.matricule) {
+    historiqueAgent.value = null
+    return
+  }
+  historiqueAgentLoading.value = true
+  try {
+    const data = await api.getHistoriqueAgent(agent.matricule)
+    historiqueAgent.value = {
+      matricule: agent.matricule,
+      nom: agent.nom,
+      saisies: data.saisies || [],
+      bilan: data.bilan || [],
+    }
+  } catch { historiqueAgent.value = null }
+  historiqueAgentLoading.value = false
+}
+
 async function chargerHistorique(immat) {
   historiqueLoading.value = true
   historiqueVehicule.value = []
   historiqueBilan.value = []
+  historiqueAgent.value = null
   try {
     const data = await api.getHistoriqueVehicule(immat)
     historiqueVehicule.value = data.saisies || []
@@ -635,7 +659,7 @@ async function submit() {
             </div>
           </div>
 
-          <!-- Résumé équipe (visible si ripeur 1 saisi) -->
+          <!-- Résumé équipe + historique ripeurs -->
           <div v-if="selectedRipeur1" class="bg-white rounded-xl border border-teal-200 p-5 space-y-3">
             <div class="flex items-center gap-2">
               <CheckCircle class="w-4 h-4 text-teal-600" />
@@ -646,22 +670,97 @@ async function submit() {
                 <div class="w-5 h-5 rounded-full bg-teal-600 flex items-center justify-center text-white text-[10px] font-bold">{{ selectedVehicule.chauffeur.charAt(0) }}</div>
                 {{ selectedVehicule.chauffeur }} <span class="text-teal-500 text-[10px]">Chauffeur</span>
               </span>
-              <span class="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-teal-50 border border-teal-200 rounded-lg text-xs font-medium">
+              <button type="button" @click="voirHistoriqueAgent(selectedRipeur1)"
+                class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-colors"
+                :class="historiqueAgent?.matricule === selectedRipeur1.matricule ? 'bg-teal-600 text-white border border-teal-600' : 'bg-teal-50 border border-teal-200 hover:bg-teal-100'">
                 <div class="w-5 h-5 rounded-full bg-teal-500 flex items-center justify-center text-white text-[10px] font-bold">{{ selectedRipeur1.nom.charAt(0) }}</div>
-                {{ selectedRipeur1.nom }} <span class="text-teal-400 text-[10px]">R1</span>
-              </span>
-              <span v-if="selectedRipeur2" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-teal-50 border border-teal-200 rounded-lg text-xs font-medium">
+                {{ selectedRipeur1.nom }} <span :class="historiqueAgent?.matricule === selectedRipeur1.matricule ? 'text-teal-200' : 'text-teal-400'" class="text-[10px]">R1</span>
+              </button>
+              <button v-if="selectedRipeur2" type="button" @click="voirHistoriqueAgent(selectedRipeur2)"
+                class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-colors"
+                :class="historiqueAgent?.matricule === selectedRipeur2.matricule ? 'bg-teal-500 text-white border border-teal-500' : 'bg-teal-50 border border-teal-200 hover:bg-teal-100'">
                 <div class="w-5 h-5 rounded-full bg-teal-400 flex items-center justify-center text-white text-[10px] font-bold">{{ selectedRipeur2.nom.charAt(0) }}</div>
-                {{ selectedRipeur2.nom }} <span class="text-teal-300 text-[10px]">R2</span>
-              </span>
-              <span v-if="selectedRipeur3" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-teal-50 border border-teal-200 rounded-lg text-xs font-medium">
+                {{ selectedRipeur2.nom }} <span :class="historiqueAgent?.matricule === selectedRipeur2.matricule ? 'text-teal-200' : 'text-teal-300'" class="text-[10px]">R2</span>
+              </button>
+              <button v-if="selectedRipeur3" type="button" @click="voirHistoriqueAgent(selectedRipeur3)"
+                class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-colors"
+                :class="historiqueAgent?.matricule === selectedRipeur3.matricule ? 'bg-teal-400 text-white border border-teal-400' : 'bg-teal-50 border border-teal-200 hover:bg-teal-100'">
                 <div class="w-5 h-5 rounded-full bg-teal-300 flex items-center justify-center text-white text-[10px] font-bold">{{ selectedRipeur3.nom.charAt(0) }}</div>
-                {{ selectedRipeur3.nom }} <span class="text-teal-300 text-[10px]">R3</span>
-              </span>
+                {{ selectedRipeur3.nom }} <span :class="historiqueAgent?.matricule === selectedRipeur3.matricule ? 'text-teal-100' : 'text-teal-300'" class="text-[10px]">R3</span>
+              </button>
               <span v-if="circuitSaisi" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-medium text-gray-600">
                 <Route class="w-3.5 h-3.5" /> {{ circuitSaisi }}
               </span>
             </div>
+            <p class="text-[10px] text-gray-400">Cliquez sur un ripeur pour voir son historique</p>
+          </div>
+
+          <!-- Panneau historique agent (ripeur) -->
+          <div v-if="historiqueAgentLoading" class="flex items-center gap-3 p-4 bg-teal-50 rounded-xl border border-teal-100">
+            <Loader2 class="w-4 h-4 text-teal-500 animate-spin" />
+            <span class="text-sm text-teal-700">Chargement historique...</span>
+          </div>
+          <div v-if="historiqueAgent" class="bg-white rounded-xl border border-teal-200 overflow-hidden">
+            <div class="px-5 py-3 bg-teal-50 border-b border-teal-200 flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <User class="w-4 h-4 text-teal-600" />
+                <span class="text-sm font-bold text-teal-800">Historique — {{ historiqueAgent.nom }}</span>
+                <span class="font-mono text-xs text-teal-500">{{ historiqueAgent.matricule }}</span>
+              </div>
+              <button type="button" @click="historiqueAgent = null" class="text-xs text-teal-500 hover:text-red-500 cursor-pointer">Fermer</button>
+            </div>
+            <div v-if="historiqueAgent.bilan.length > 0" class="p-4 border-b border-gray-100">
+              <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Bilan mensuel</p>
+              <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                <div v-for="b in historiqueAgent.bilan" :key="b.mois" class="rounded-lg bg-gray-50 border border-gray-200 p-3">
+                  <p class="text-xs font-bold text-gray-700 font-mono mb-1">{{ b.mois }}</p>
+                  <div class="grid grid-cols-2 gap-1 text-[11px]">
+                    <div><span class="text-gray-400">Jours</span> <span class="font-mono font-bold text-gray-900 ml-1">{{ b.jours_travailles }}</span></div>
+                    <div><span class="text-gray-400">Tonnage</span> <span class="font-mono font-bold text-gray-900 ml-1">{{ b.tonnage_cumule }} t</span></div>
+                    <div><span class="text-gray-400">Rotations</span> <span class="font-mono font-bold text-gray-900 ml-1">{{ b.rotations_cumul }}</span></div>
+                    <div><span class="text-gray-400">Moy/j</span> <span class="font-mono font-bold text-gray-900 ml-1">{{ b.tonnage_moyen }} t</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div v-if="historiqueAgent.saisies.length > 0" class="overflow-x-auto">
+              <p class="px-4 pt-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Dernières saisies</p>
+              <table class="w-full text-xs mt-2">
+                <thead>
+                  <tr class="bg-gray-50 border-b border-gray-100">
+                    <th class="text-left px-3 py-2 font-semibold text-gray-500">Date</th>
+                    <th class="text-left px-3 py-2 font-semibold text-gray-500">Rôle</th>
+                    <th class="text-left px-3 py-2 font-semibold text-gray-500">Véhicule</th>
+                    <th class="text-left px-3 py-2 font-semibold text-gray-500">Chauffeur</th>
+                    <th class="text-left px-3 py-2 font-semibold text-gray-500">Circuit</th>
+                    <th class="text-right px-3 py-2 font-semibold text-gray-500">Tonnage</th>
+                    <th class="text-center px-3 py-2 font-semibold text-gray-500">Service</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-50">
+                  <tr v-for="(h, i) in historiqueAgent.saisies" :key="i" class="hover:bg-gray-50/50">
+                    <td class="px-3 py-2 font-mono text-gray-700">{{ h.date.split('-').reverse().join('/') }}</td>
+                    <td class="px-3 py-2">
+                      <span class="px-1.5 py-0.5 rounded text-[10px] font-bold"
+                        :class="h.role_dans_equipe === 'Chauffeur' ? 'bg-emerald-100 text-emerald-700' : 'bg-teal-100 text-teal-700'">
+                        {{ h.role_dans_equipe }}
+                      </span>
+                    </td>
+                    <td class="px-3 py-2 font-mono text-gray-700">{{ h.immatriculation }}</td>
+                    <td class="px-3 py-2 text-gray-900">{{ h.chauffeur_nom || '-' }}</td>
+                    <td class="px-3 py-2 text-gray-600">{{ h.circuit || '-' }}</td>
+                    <td class="px-3 py-2 text-right font-mono font-semibold">{{ h.tonnage }} t</td>
+                    <td class="px-3 py-2 text-center">
+                      <span class="px-1.5 py-0.5 rounded text-[10px] font-bold"
+                        :class="h.service === 'TRI' ? 'bg-teal-100 text-teal-700' : 'bg-emerald-100 text-emerald-700'">
+                        {{ h.service }}
+                      </span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div v-else class="p-4 text-sm text-gray-400 text-center">Aucune saisie trouvée</div>
           </div>
 
           <!-- Boutons Retour + Valider (toujours visibles) -->

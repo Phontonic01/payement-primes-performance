@@ -221,6 +221,60 @@ router.get('/historique-vehicule/:immatriculation', (req, res) => {
   res.json({ saisies, bilan: bilanRows })
 })
 
+// ═══ HISTORIQUE AGENT (chauffeur ou ripeur) ═══
+
+router.get('/historique-agent/:matricule', (req, res) => {
+  const mat = req.params.matricule
+
+  // Fiches collecte où l'agent est chauffeur ou ripeur
+  const fiches = db.prepare(`
+    SELECT date, chauffeur_matricule, chauffeur_nom, ripeur1_matricule, ripeur1_nom,
+      ripeur2_matricule, ripeur2_nom, immatriculation, circuit, tonnage, rotations, 'COLLECTE' as service,
+      CASE
+        WHEN chauffeur_matricule = ? THEN 'Chauffeur'
+        WHEN ripeur1_matricule = ? THEN 'Ripeur 1'
+        WHEN ripeur2_matricule = ? THEN 'Ripeur 2'
+      END as role_dans_equipe
+    FROM fiches_collecte
+    WHERE chauffeur_matricule = ? OR ripeur1_matricule = ? OR ripeur2_matricule = ?
+    ORDER BY date DESC LIMIT 30
+  `).all(mat, mat, mat, mat, mat, mat)
+
+  // Saisies TRI
+  const tri = db.prepare(`
+    SELECT date, chauffeur_matricule, chauffeur_nom, ripeur1_matricule, ripeur1_nom,
+      ripeur2_matricule, ripeur2_nom, ripeur3_matricule, ripeur3_nom,
+      immatriculation, arrondissement as circuit, tonnage_collecte as tonnage, rotations, 'TRI' as service,
+      CASE
+        WHEN chauffeur_matricule = ? THEN 'Chauffeur'
+        WHEN ripeur1_matricule = ? THEN 'Ripeur 1'
+        WHEN ripeur2_matricule = ? THEN 'Ripeur 2'
+        WHEN ripeur3_matricule = ? THEN 'Ripeur 3'
+      END as role_dans_equipe
+    FROM tri_saisies
+    WHERE chauffeur_matricule = ? OR ripeur1_matricule = ? OR ripeur2_matricule = ? OR ripeur3_matricule = ?
+    ORDER BY date DESC LIMIT 30
+  `).all(mat, mat, mat, mat, mat, mat, mat, mat)
+
+  const saisies = [...fiches, ...tri].sort((a, b) => b.date.localeCompare(a.date))
+
+  // Bilan mensuel
+  const bilan = db.prepare(`
+    SELECT
+      substr(date, 1, 7) as mois,
+      COUNT(DISTINCT date) as jours_travailles,
+      SUM(tonnage) as tonnage_cumule,
+      SUM(rotations) as rotations_cumul,
+      ROUND(AVG(tonnage), 2) as tonnage_moyen
+    FROM tonnages
+    WHERE matricule = ?
+    GROUP BY substr(date, 1, 7)
+    ORDER BY mois DESC LIMIT 6
+  `).all(mat)
+
+  res.json({ saisies, bilan })
+})
+
 // ═══ ÉQUIPES VÉHICULE (mémoire dernière composition) ═══
 
 router.get('/equipe/:immatriculation', (req, res) => {
