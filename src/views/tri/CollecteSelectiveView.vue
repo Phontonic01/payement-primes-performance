@@ -140,14 +140,18 @@ const circuitSaisi = ref('')
 
 // ── Historique équipages ──
 const historiqueVehicule = ref([])
+const historiqueBilan = ref([])
 const historiqueLoading = ref(false)
 const historiqueOuvert = ref(false)
 
 async function chargerHistorique(immat) {
   historiqueLoading.value = true
   historiqueVehicule.value = []
+  historiqueBilan.value = []
   try {
-    historiqueVehicule.value = await api.getHistoriqueVehicule(immat)
+    const data = await api.getHistoriqueVehicule(immat)
+    historiqueVehicule.value = data.saisies || []
+    historiqueBilan.value = data.bilan || []
   } catch { /* pas bloquant */ }
   historiqueLoading.value = false
 }
@@ -466,14 +470,14 @@ async function submit() {
             </div>
           </div>
 
-          <!-- Historique équipages -->
+          <!-- Historique équipages + bilan -->
           <div class="bg-white rounded-xl border border-gray-100 overflow-hidden">
             <button type="button" @click="historiqueOuvert = !historiqueOuvert"
               class="w-full flex items-center justify-between px-5 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer">
               <span class="flex items-center gap-2">
                 <Users class="w-4 h-4 text-gray-400" />
-                Historique des équipages de ce véhicule
-                <span v-if="historiqueVehicule.length > 0" class="text-xs text-gray-400 font-mono">({{ historiqueVehicule.length }})</span>
+                Historique de ce véhicule
+                <span v-if="historiqueVehicule.length > 0" class="text-xs text-gray-400 font-mono">({{ historiqueVehicule.length }} saisies)</span>
               </span>
               <ChevronRight class="w-4 h-4 text-gray-400 transition-transform" :class="{ 'rotate-90': historiqueOuvert }" />
             </button>
@@ -481,40 +485,78 @@ async function submit() {
               <div v-if="historiqueLoading" class="p-4 flex items-center gap-2 text-sm text-gray-500">
                 <Loader2 class="w-4 h-4 animate-spin" /> Chargement...
               </div>
-              <div v-else-if="historiqueVehicule.length === 0" class="p-4 text-sm text-gray-400 text-center">
-                Aucune saisie précédente pour ce véhicule
-              </div>
-              <div v-else class="overflow-x-auto">
-                <table class="w-full text-xs">
-                  <thead>
-                    <tr class="bg-gray-50 border-b border-gray-100">
-                      <th class="text-left px-3 py-2 font-semibold text-gray-500">Date</th>
-                      <th class="text-left px-3 py-2 font-semibold text-gray-500">Chauffeur</th>
-                      <th class="text-left px-3 py-2 font-semibold text-gray-500">Ripeur 1</th>
-                      <th class="text-left px-3 py-2 font-semibold text-gray-500">Ripeur 2</th>
-                      <th class="text-left px-3 py-2 font-semibold text-gray-500">Circuit</th>
-                      <th class="text-right px-3 py-2 font-semibold text-gray-500">Tonnage</th>
-                      <th class="text-center px-3 py-2 font-semibold text-gray-500">Service</th>
-                    </tr>
-                  </thead>
-                  <tbody class="divide-y divide-gray-50">
-                    <tr v-for="(h, i) in historiqueVehicule" :key="i" class="hover:bg-gray-50/50">
-                      <td class="px-3 py-2 font-mono text-gray-700">{{ h.date.split('-').reverse().join('/') }}</td>
-                      <td class="px-3 py-2 text-gray-900">{{ h.chauffeur_nom || '-' }}</td>
-                      <td class="px-3 py-2 text-gray-700">{{ h.ripeur1_nom || '-' }}</td>
-                      <td class="px-3 py-2 text-gray-700">{{ h.ripeur2_nom || '-' }}</td>
-                      <td class="px-3 py-2 text-gray-600">{{ h.circuit || '-' }}</td>
-                      <td class="px-3 py-2 text-right font-mono font-semibold text-gray-900">{{ h.tonnage }} t</td>
-                      <td class="px-3 py-2 text-center">
-                        <span class="px-1.5 py-0.5 rounded text-[10px] font-bold"
-                          :class="h.service === 'TRI' ? 'bg-teal-100 text-teal-700' : 'bg-emerald-100 text-emerald-700'">
-                          {{ h.service }}
-                        </span>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+              <template v-else>
+                <!-- Bilan mensuel -->
+                <div v-if="historiqueBilan.length > 0" class="p-4 border-b border-gray-100 space-y-3">
+                  <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Bilan mensuel</p>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <div v-for="b in historiqueBilan" :key="b.mois + b.matricule"
+                      class="rounded-xl bg-gray-50 border border-gray-200 p-3 space-y-2">
+                      <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-gray-700 font-mono">{{ b.mois }}</span>
+                        <span class="text-xs text-gray-500">{{ b.agent_nom }}</span>
+                      </div>
+                      <div class="grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <p class="text-[10px] text-gray-400">Jours travaillés</p>
+                          <p class="font-mono font-bold text-gray-900">{{ b.jours_travailles }} j</p>
+                        </div>
+                        <div>
+                          <p class="text-[10px] text-gray-400">Tonnage cumulé</p>
+                          <p class="font-mono font-bold text-gray-900">{{ b.tonnage_cumule }} t</p>
+                        </div>
+                        <div>
+                          <p class="text-[10px] text-gray-400">Rotations cumulées</p>
+                          <p class="font-mono font-bold text-gray-900">{{ b.rotations_cumul }}</p>
+                        </div>
+                        <div>
+                          <p class="text-[10px] text-gray-400">Moyenne / jour</p>
+                          <p class="font-mono font-bold text-gray-900">{{ b.tonnage_moyen }} t</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Tableau saisies -->
+                <div v-if="historiqueVehicule.length === 0" class="p-4 text-sm text-gray-400 text-center">
+                  Aucune saisie précédente pour ce véhicule
+                </div>
+                <div v-else class="overflow-x-auto">
+                  <p class="px-4 pt-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Détail des saisies</p>
+                  <table class="w-full text-xs mt-2">
+                    <thead>
+                      <tr class="bg-gray-50 border-b border-gray-100">
+                        <th class="text-left px-3 py-2 font-semibold text-gray-500">Date</th>
+                        <th class="text-left px-3 py-2 font-semibold text-gray-500">Chauffeur</th>
+                        <th class="text-left px-3 py-2 font-semibold text-gray-500">Ripeur 1</th>
+                        <th class="text-left px-3 py-2 font-semibold text-gray-500">Ripeur 2</th>
+                        <th class="text-left px-3 py-2 font-semibold text-gray-500">Circuit</th>
+                        <th class="text-right px-3 py-2 font-semibold text-gray-500">Tonnage</th>
+                        <th class="text-right px-3 py-2 font-semibold text-gray-500">Rotations</th>
+                        <th class="text-center px-3 py-2 font-semibold text-gray-500">Service</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-50">
+                      <tr v-for="(h, i) in historiqueVehicule" :key="i" class="hover:bg-gray-50/50">
+                        <td class="px-3 py-2 font-mono text-gray-700">{{ h.date.split('-').reverse().join('/') }}</td>
+                        <td class="px-3 py-2 text-gray-900">{{ h.chauffeur_nom || '-' }}</td>
+                        <td class="px-3 py-2 text-gray-700">{{ h.ripeur1_nom || '-' }}</td>
+                        <td class="px-3 py-2 text-gray-700">{{ h.ripeur2_nom || '-' }}</td>
+                        <td class="px-3 py-2 text-gray-600">{{ h.circuit || '-' }}</td>
+                        <td class="px-3 py-2 text-right font-mono font-semibold text-gray-900">{{ h.tonnage }} t</td>
+                        <td class="px-3 py-2 text-right font-mono text-gray-700">{{ h.rotations }}</td>
+                        <td class="px-3 py-2 text-center">
+                          <span class="px-1.5 py-0.5 rounded text-[10px] font-bold"
+                            :class="h.service === 'TRI' ? 'bg-teal-100 text-teal-700' : 'bg-emerald-100 text-emerald-700'">
+                            {{ h.service }}
+                          </span>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </template>
             </div>
           </div>
 

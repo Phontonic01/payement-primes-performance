@@ -199,8 +199,26 @@ router.get('/historique-vehicule/:immatriculation', (req, res) => {
   `).all(immat)
 
   // Fusionner et trier par date desc
-  const all = [...fiches, ...tri].sort((a, b) => b.date.localeCompare(a.date))
-  res.json(all)
+  const saisies = [...fiches, ...tri].sort((a, b) => b.date.localeCompare(a.date))
+
+  // Bilan mensuel agrégé par chauffeur depuis les tonnages
+  const bilanRows = db.prepare(`
+    SELECT
+      substr(date, 1, 7) as mois,
+      matricule,
+      agent_nom,
+      COUNT(DISTINCT date) as jours_travailles,
+      SUM(tonnage) as tonnage_cumule,
+      SUM(rotations) as rotations_cumul,
+      ROUND(AVG(tonnage), 2) as tonnage_moyen
+    FROM tonnages
+    WHERE immatriculation = ?
+    GROUP BY substr(date, 1, 7), matricule
+    ORDER BY mois DESC
+    LIMIT 12
+  `).all(immat)
+
+  res.json({ saisies, bilan: bilanRows })
 })
 
 // ═══ ÉQUIPES VÉHICULE (mémoire dernière composition) ═══
