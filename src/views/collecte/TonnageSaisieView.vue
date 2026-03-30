@@ -5,9 +5,8 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import DateInput from '@/components/ui/DateInput.vue'
 import AgentSearchInput from '@/components/ui/AgentSearchInput.vue'
 import {
-  Truck, Weight, RotateCcw, Calendar, User, Gauge, Hash, Users, MapPin,
-  Route, ChevronRight, ChevronLeft, CheckCircle, Zap, Loader2, WifiOff,
-  Search, RefreshCw
+  Truck, Calendar, Users, Route, Zap, Loader2, WifiOff,
+  Search, RefreshCw, ArrowLeft, CheckCircle, X, ChevronRight
 } from 'lucide-vue-next'
 import { useToastStore } from '@/stores/toast'
 import { useSaisiesStore } from '@/stores/saisies'
@@ -27,14 +26,6 @@ const primesStore = usePrimesStore()
 const readOnly = computed(() => authStore.isReadOnly())
 const router = useRouter()
 
-// ── Étapes du workflow ──
-const activeStep = ref('vehicule')
-const steps = [
-  { id: 'vehicule', label: 'Véhicule', icon: Truck },
-  { id: 'ripeur', label: 'Ripeurs', icon: Users },
-  { id: 'recap', label: 'Validation', icon: CheckCircle },
-]
-
 // ── Date ──
 const date = ref(new Date().toISOString().split('T')[0])
 
@@ -42,19 +33,18 @@ const date = ref(new Date().toISOString().split('T')[0])
 const pontBasculeLoading = ref(false)
 const pontBasculeError = ref('')
 const vehiculesDuJour = ref([])
-const bilanMensuel = ref(null) // bilan cumulé avec pénalités jour par jour
+const bilanMensuel = ref(null)
 const searchQuery = ref('')
-const filtreEquipe = ref('TOUS') // TOUS, JOUR, NUIT
+const filtreEquipe = ref('TOUS')
 const selectedVehicule = ref(null)
 
 async function chargerVehiculesDuJour() {
   pontBasculeLoading.value = true
   pontBasculeError.value = ''
   vehiculesDuJour.value = []
-  selectedVehicule.value = null
+  fermerFormulaire()
   try {
     const mois = date.value.slice(0, 7)
-    // Charger les véhicules du jour ET le bilan mensuel en parallèle
     const [dataJour, dataBilan] = await Promise.all([
       api.pontBasculeVehiculesDuJour(date.value, 'CLEAN AFRICA'),
       api.pontBasculeBilan(mois),
@@ -62,7 +52,6 @@ async function chargerVehiculesDuJour() {
 
     bilanMensuel.value = dataBilan
 
-    // Enrichir chaque véhicule du jour avec les pénalités cumulées du mois
     const bilanMap = {}
     if (dataBilan?.chauffeurs) {
       dataBilan.chauffeurs.forEach(c => { bilanMap[c.code_transporteur] = c })
@@ -72,7 +61,6 @@ async function chargerVehiculesDuJour() {
       const bilan = bilanMap[v.code_transporteur]
       return {
         ...v,
-        // Données cumulées du mois depuis le bilan
         bilan: bilan || null,
         jours_present: bilan?.jours_present || v.jours_present || 0,
         taux_presence: bilan?.taux_presence || v.taux_presence || 0,
@@ -93,277 +81,215 @@ async function chargerVehiculesDuJour() {
   }
 }
 
-// Charger au montage et quand la date change
 watch(date, () => chargerVehiculesDuJour(), { immediate: true })
 
-// ── Paramètres Note de Service ──
-const joursOuvresMois = computed(() => primesStore.config.joursOuvresMois) // 30
-const seuilPresence = computed(() => primesStore.config.seuilPresence) // 93
-const plafond = computed(() => primesStore.config.plafonds.CHAUFFEUR_COLLECTE) // 50000
+// ── Paramètres ──
+const plafond = computed(() => primesStore.config.plafonds.CHAUFFEUR_COLLECTE)
+const seuilPresence = computed(() => primesStore.config.seuilPresence)
 
-/**
- * Prime par dégression — pénalités cumulées jour par jour depuis le bilan mensuel.
- *
- * Plafond (50 000 F) - pénalités cumulées du mois = reste à payer.
- * Chaque mauvais jour enlève (833 F × % manqué) sur l'axe tonnage.
- * Présence < 93% → prime au prorata.
- */
 function estimerPrime(v) {
-  const p = plafond.value // 50 000
-
-  // Pénalités cumulées du mois (viennent du bilan API, calculées jour par jour)
+  const p = plafond.value
   const penalites = v.penalites_mois || { tonnage: 0, bouclage: 0, entretien: 0, qhse: 0, total: 0 }
-
-  // Prime avant prorata
   const primeAvant = Math.max(0, p - penalites.total)
-
-  // Présence
-  const joursPresent = v.jours_present || 0
-  const tauxPresence = v.taux_presence || 0
-  const prorata = v.prorata || false
   const primeFinale = v.prime_finale ?? primeAvant
-
-  // Score global pour la couleur (approximation)
   const scoreGlobal = (primeFinale / p) * 100
-
   return {
-    plafond: p,
-    penalites,
-    primeAvant,
-    primeFinale,
-    scoreGlobal,
-    joursPresent,
-    tauxPresence,
-    prorata,
-    // Nombre de jours avec des pénalités
-    nbJoursPenalises: v.bilan?.detail_jours?.filter(j => j.penalite > 0).length || 0,
-    nbJoursSansPenalite: v.bilan?.detail_jours?.filter(j => j.penalite === 0).length || 0,
+    plafond: p, penalites, primeAvant, primeFinale, scoreGlobal,
+    joursPresent: v.jours_present || 0,
+    tauxPresence: v.taux_presence || 0,
+    prorata: v.prorata || false,
   }
 }
 
-// Couleur selon le score
 function primeColor(scoreGlobal) {
   if (scoreGlobal >= 75) return 'text-emerald-700 bg-emerald-50'
   if (scoreGlobal >= 60) return 'text-amber-700 bg-amber-50'
   return 'text-red-700 bg-red-50'
 }
 
-// Couleur barre de progression
 function barColor(scoreGlobal) {
   if (scoreGlobal >= 75) return 'bg-emerald-500'
   if (scoreGlobal >= 60) return 'bg-amber-500'
   return 'bg-red-500'
 }
 
-// Filtrer la liste des véhicules par recherche ET par équipe
+// Filtrer la liste
 const vehiculesFiltres = computed(() => {
   let list = vehiculesDuJour.value
-
-  // Filtre par équipe
-  if (filtreEquipe.value !== 'TOUS') {
-    list = list.filter(v => v.equipe === filtreEquipe.value)
-  }
-
-  // Filtre par recherche texte (N° parc, nom, matricule RH)
+  if (filtreEquipe.value !== 'TOUS') list = list.filter(v => v.equipe === filtreEquipe.value)
   if (searchQuery.value) {
     const q = searchQuery.value.toLowerCase().trim()
     list = list.filter(v => {
-      const matricule = String(v.code_transporteur || '')
-      const matriculePad = matricule.padStart(4, '0')
+      const mat = String(v.code_transporteur || '')
       return v.immatriculation.toLowerCase().includes(q) ||
         v.chauffeur.toLowerCase().includes(q) ||
         v.arrondissement.toLowerCase().includes(q) ||
-        matricule.includes(q) ||
-        matriculePad.includes(q)
+        mat.includes(q) || mat.padStart(4, '0').includes(q)
     })
   }
-
   return list
 })
 
-// Compteurs par équipe
 const nbJour = computed(() => vehiculesDuJour.value.filter(v => v.equipe === 'JOUR').length)
 const nbNuit = computed(() => vehiculesDuJour.value.filter(v => v.equipe === 'NUIT').length)
 
-// ── Fiche détaillée d'un agent (historique mensuel) ──
-const ficheAgent = ref(null)
-const ficheLoading = ref(false)
+// ── Sélection véhicule → ouvre le formulaire ──
+const equipeSuggestion = ref(null)
+const equipeLoading = ref(false)
+const equipeAcceptee = ref(false)
 
-function ouvrirFicheAgent(v) {
-  // Naviguer vers la page dédiée de l'agent
-  router.push({ name: 'fiche-agent', params: { matricule: v.code_transporteur } })
+// ── Historique équipages ──
+const historiqueVehicule = ref([])
+const historiqueLoading = ref(false)
+const historiqueOuvert = ref(false)
+
+async function chargerHistorique(immat) {
+  historiqueLoading.value = true
+  historiqueVehicule.value = []
+  try {
+    historiqueVehicule.value = await api.getHistoriqueVehicule(immat)
+  } catch { /* pas bloquant */ }
+  historiqueLoading.value = false
 }
 
-function fermerFicheAgent() {
-  ficheAgent.value = null
-}
-
-function selectionnerVehicule(v) {
-  selectedVehicule.value = v
-  activeStep.value = 'ripeur'
-}
-
-// ── Ripeurs (saisie manuelle) ──
 const ripeur1Matricule = ref('')
 const ripeur2Matricule = ref('')
 const ripeur3Matricule = ref('')
 const selectedRipeur1 = ref(null)
 const selectedRipeur2 = ref(null)
 const selectedRipeur3 = ref(null)
+const circuitSaisi = ref('')
 
-// ── Correspondance véhicule local (optionnel) ──
+async function selectionnerVehicule(v) {
+  selectedVehicule.value = v
+  // Reset formulaire
+  ripeur1Matricule.value = ''
+  ripeur2Matricule.value = ''
+  ripeur3Matricule.value = ''
+  selectedRipeur1.value = null
+  selectedRipeur2.value = null
+  selectedRipeur3.value = null
+  circuitSaisi.value = ''
+  equipeSuggestion.value = null
+  equipeAcceptee.value = false
+
+  // Charger historique + suggestion en parallèle
+  historiqueOuvert.value = false
+  chargerHistorique(v.immatriculation)
+  equipeLoading.value = true
+  try {
+    const eq = await api.getEquipeVehicule(v.immatriculation, 'COLLECTE')
+    if (eq && eq.ripeur1_matricule) equipeSuggestion.value = eq
+  } catch { /* pas d'équipe connue */ }
+  equipeLoading.value = false
+
+  // Scroll vers le formulaire
+  setTimeout(() => {
+    document.getElementById('formulaire-equipe')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, 100)
+}
+
+function fermerFormulaire() {
+  selectedVehicule.value = null
+  equipeSuggestion.value = null
+  equipeAcceptee.value = false
+  ripeur1Matricule.value = ''
+  ripeur2Matricule.value = ''
+  ripeur3Matricule.value = ''
+  selectedRipeur1.value = null
+  selectedRipeur2.value = null
+  selectedRipeur3.value = null
+  circuitSaisi.value = ''
+}
+
+function appliquerEquipe(eq) {
+  if (eq.ripeur1_matricule) {
+    ripeur1Matricule.value = eq.ripeur1_matricule
+    selectedRipeur1.value = agentsStore.getAgentByMatricule(eq.ripeur1_matricule)
+      || { matricule: eq.ripeur1_matricule, nom: eq.ripeur1_nom }
+  }
+  if (eq.ripeur2_matricule) {
+    ripeur2Matricule.value = eq.ripeur2_matricule
+    selectedRipeur2.value = agentsStore.getAgentByMatricule(eq.ripeur2_matricule)
+      || { matricule: eq.ripeur2_matricule, nom: eq.ripeur2_nom }
+  }
+  if (eq.ripeur3_matricule) {
+    ripeur3Matricule.value = eq.ripeur3_matricule
+    selectedRipeur3.value = agentsStore.getAgentByMatricule(eq.ripeur3_matricule)
+      || { matricule: eq.ripeur3_matricule, nom: eq.ripeur3_nom }
+  }
+  if (eq.circuit) circuitSaisi.value = eq.circuit
+  equipeAcceptee.value = true
+}
+
+// ── Correspondance véhicule local ──
 const vehiculeLocal = computed(() => {
   if (!selectedVehicule.value) return null
   return vehiculesStore.vehiculesOperationnels.find(
     v => v.immatriculation === selectedVehicule.value.immatriculation
   ) || null
 })
-
 const vehiculeType = computed(() => vehiculeLocal.value?.type || 'BOM')
-
-// ── Score estimé ──
-const scoreEstime = computed(() => {
-  if (!selectedVehicule.value) return null
-  const t = selectedVehicule.value.tonnage_tonnes
-  const r = selectedVehicule.value.rotations
-  if (r <= 0) return null
-  const avg = t / r
-  const type = vehiculeType.value
-  let score, label
-
-  if (type === 'BOM') {
-    if (avg >= 11) { score = 100; label = 'Excellent' }
-    else if (avg >= 8) { score = 75; label = 'Bien' }
-    else if (avg >= 7) { score = 50; label = 'Passable' }
-    else { score = 0; label = 'Insuffisant' }
-  } else if (type === 'Plateaux') {
-    if (t >= 7.5 || r >= 4) { score = 100; label = 'Excellent' }
-    else if (r >= 3) { score = 75; label = 'Bien' }
-    else if (r >= 2) { score = 50; label = 'Passable' }
-    else { score = 0; label = 'Insuffisant' }
-  } else if (type === 'Bennes') {
-    if (avg >= 7 && r > 2) { score = 100; label = 'Excellent' }
-    else if (avg >= 7 && r >= 2) { score = 50; label = 'Passable' }
-    else { score = 0; label = 'Insuffisant' }
-  } else if (type === 'Movi') {
-    if (r > 4) { score = 100; label = 'Excellent' }
-    else if (r >= 4) { score = 50; label = 'Passable' }
-    else { score = 0; label = 'Insuffisant' }
-  } else {
-    if (avg >= 5) { score = 100; label = 'Excellent' }
-    else if (avg >= 3) { score = 75; label = 'Bien' }
-    else if (avg >= 1) { score = 50; label = 'Passable' }
-    else { score = 0; label = 'Insuffisant' }
-  }
-
-  const color = score >= 75 ? 'text-emerald-600' : score >= 50 ? 'text-amber-600' : 'text-red-600'
-  const bg = score >= 75 ? 'bg-emerald-50' : score >= 50 ? 'bg-amber-50' : 'bg-red-50'
-  const border = score >= 75 ? 'border-emerald-200' : score >= 50 ? 'border-amber-200' : 'border-red-200'
-  return { score, label, color, bg, border }
-})
-
-// ── Navigation ──
-function nextStep() {
-  const idx = steps.findIndex(s => s.id === activeStep.value)
-  if (idx < steps.length - 1) activeStep.value = steps[idx + 1].id
-}
-function prevStep() {
-  const idx = steps.findIndex(s => s.id === activeStep.value)
-  if (idx > 0) activeStep.value = steps[idx - 1].id
-}
 
 // ── Soumission ──
 function submit() {
-  if (!selectedVehicule.value) {
-    toastStore.addToast('Veuillez sélectionner un véhicule.', 'warning')
-    activeStep.value = 'vehicule'
-    return
-  }
+  if (!selectedVehicule.value) return
   if (!selectedRipeur1.value) {
     toastStore.addToast('Veuillez sélectionner au moins le Ripeur 1.', 'warning')
-    activeStep.value = 'ripeur'
     return
   }
 
   const v = selectedVehicule.value
   const vLocal = vehiculeLocal.value
   const vLabel = vLocal ? `${vLocal.type} N°${vLocal.noParc} — ${vLocal.immatriculation}` : v.immatriculation
+  const circuitFinal = circuitSaisi.value || v.origine
 
   const saisieBase = {
-    date: date.value,
-    vehicule: vehiculeType.value,
-    noParc: vLocal?.noParc || '',
-    immatriculation: v.immatriculation,
-    vehiculeLabel: vLabel,
-    tonnage: v.tonnage_tonnes,
-    rotations: v.rotations,
-    arrondissement: v.arrondissement,
-    secteur: '',
-    circuit: v.origine,
+    date: date.value, vehicule: vehiculeType.value,
+    noParc: vLocal?.noParc || '', immatriculation: v.immatriculation,
+    vehiculeLabel: vLabel, tonnage: v.tonnage_tonnes, rotations: v.rotations,
+    arrondissement: v.arrondissement, secteur: '', circuit: circuitFinal,
   }
 
-  // Enregistrer les tonnages pour le chauffeur (donnée pont-bascule)
-  saisiesStore.enregistrerTonnage({
-    ...saisieBase,
-    matricule: v.code_transporteur || v.immatriculation,
-    agent: v.chauffeur,
-  })
+  // Tonnages chauffeur + ripeurs
+  saisiesStore.enregistrerTonnage({ ...saisieBase, matricule: v.code_transporteur || v.immatriculation, agent: v.chauffeur })
+  saisiesStore.enregistrerTonnage({ ...saisieBase, matricule: selectedRipeur1.value.matricule, agent: selectedRipeur1.value.nom })
+  if (selectedRipeur2.value) saisiesStore.enregistrerTonnage({ ...saisieBase, matricule: selectedRipeur2.value.matricule, agent: selectedRipeur2.value.nom })
+  if (selectedRipeur3.value) saisiesStore.enregistrerTonnage({ ...saisieBase, matricule: selectedRipeur3.value.matricule, agent: selectedRipeur3.value.nom })
 
-  // Enregistrer pour le ripeur 1
-  saisiesStore.enregistrerTonnage({
-    ...saisieBase,
-    matricule: selectedRipeur1.value.matricule,
-    agent: selectedRipeur1.value.nom,
-  })
-
-  // Ripeur 2 si présent
-  if (selectedRipeur2.value) {
-    saisiesStore.enregistrerTonnage({
-      ...saisieBase,
-      matricule: selectedRipeur2.value.matricule,
-      agent: selectedRipeur2.value.nom,
-    })
-  }
-
-  // Ripeur 3 si présent
-  if (selectedRipeur3.value) {
-    saisiesStore.enregistrerTonnage({
-      ...saisieBase,
-      matricule: selectedRipeur3.value.matricule,
-      agent: selectedRipeur3.value.nom,
-    })
-  }
-
-  // Fiche collecte complète
+  // Fiche collecte
   const ficheId = saisiesStore.enregistrerFicheCollecte({
     date: date.value,
     chauffeur: { matricule: v.code_transporteur || v.immatriculation, nom: v.chauffeur },
-    ripeur1: selectedRipeur1.value,
-    ripeur2: selectedRipeur2.value,
-    ripeur3: selectedRipeur3.value,
-    vehiculeType: vehiculeType.value,
-    vehiculeLabel: vLabel,
-    noParc: vLocal?.noParc || '',
-    immatriculation: v.immatriculation,
-    arrondissement: v.arrondissement,
-    secteur: '',
-    circuit: v.origine,
-    tonnage: v.tonnage_tonnes,
-    rotations: v.rotations,
+    ripeur1: selectedRipeur1.value, ripeur2: selectedRipeur2.value, ripeur3: selectedRipeur3.value,
+    vehiculeType: vehiculeType.value, vehiculeLabel: vLabel,
+    noParc: vLocal?.noParc || '', immatriculation: v.immatriculation,
+    arrondissement: v.arrondissement, secteur: '', circuit: circuitFinal,
+    tonnage: v.tonnage_tonnes, rotations: v.rotations,
   })
 
-  toastStore.addToast('Fiche collecte enregistrée avec succès !', 'success')
+  // Sauvegarder l'équipe pour suggestion future
+  api.saveEquipeVehicule({
+    immatriculation: v.immatriculation, service: 'COLLECTE',
+    chauffeur_matricule: v.code_transporteur || '', chauffeur_nom: v.chauffeur || '',
+    ripeur1_matricule: selectedRipeur1.value?.matricule || '', ripeur1_nom: selectedRipeur1.value?.nom || '',
+    ripeur2_matricule: selectedRipeur2.value?.matricule || '', ripeur2_nom: selectedRipeur2.value?.nom || '',
+    ripeur3_matricule: selectedRipeur3.value?.matricule || '', ripeur3_nom: selectedRipeur3.value?.nom || '',
+    circuit: circuitFinal,
+  }).catch(() => {})
+
+  toastStore.addToast('Fiche collecte enregistrée !', 'success')
   router.push(`/collecte/fiche/${ficheId}`)
 }
 </script>
 
 <template>
   <div class="space-y-6">
-    <!-- Page header -->
+    <!-- Header -->
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
       <div>
         <h1 class="text-2xl font-bold text-gray-900">Saisie Collecte</h1>
-        <p class="text-sm text-gray-500 mt-0.5">Données automatiques pont-bascule — Ajoutez les ripeurs</p>
+        <p class="text-sm text-gray-500 mt-0.5">Choisissez un chauffeur, ajoutez les ripeurs et le circuit</p>
       </div>
       <div class="flex items-center gap-2 px-4 py-2 bg-emerald-50 border border-emerald-200 rounded-xl shadow-sm">
         <Zap class="w-4 h-4 text-emerald-600" />
@@ -381,42 +307,18 @@ function submit() {
         </div>
         <div>
           <h3 class="text-sm font-semibold text-gray-900">Date du relevé</h3>
-          <p class="text-xs text-gray-500">Les données pont-bascule sont chargées automatiquement</p>
+          <p class="text-xs text-gray-500">Les chauffeurs sont chargés depuis le pont-bascule</p>
         </div>
       </div>
       <DateInput v-model="date" required />
-      <button
-        type="button"
-        @click="chargerVehiculesDuJour"
-        class="flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl hover:bg-emerald-100 transition-colors cursor-pointer"
-      >
-        <RefreshCw class="w-4 h-4" />
-        Actualiser
+      <button type="button" @click="chargerVehiculesDuJour"
+        class="flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl hover:bg-emerald-100 transition-colors cursor-pointer">
+        <RefreshCw class="w-4 h-4" /> Actualiser
       </button>
     </div>
 
-    <!-- Étapes -->
-    <div class="flex items-center gap-2 px-1">
-      <template v-for="(step, i) in steps" :key="step.id">
-        <button
-          type="button"
-          @click="activeStep = step.id"
-          class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer"
-          :class="activeStep === step.id
-            ? 'bg-emerald-600 text-white shadow-sm'
-            : step.id === 'recap' && selectedVehicule && selectedRipeur1
-              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-              : 'bg-gray-100 text-gray-500'"
-        >
-          <component :is="step.icon" class="w-4 h-4" />
-          {{ step.label }}
-        </button>
-        <ChevronRight v-if="i < steps.length - 1" class="w-4 h-4 text-gray-300" />
-      </template>
-    </div>
-
-    <!-- ═══ ÉTAPE 1 : VÉHICULE (pont-bascule) ═══ -->
-    <div v-show="activeStep === 'vehicule'" class="space-y-4" :class="{ 'opacity-60 pointer-events-none': readOnly }">
+    <!-- ═══ LISTE DES VÉHICULES / CHAUFFEURS ═══ -->
+    <div :class="{ 'opacity-60 pointer-events-none': readOnly }">
 
       <!-- Chargement -->
       <div v-if="pontBasculeLoading" class="bg-white rounded-xl border border-gray-100 p-12 flex flex-col items-center gap-3">
@@ -433,150 +335,41 @@ function submit() {
         </div>
       </div>
 
-      <!-- Liste des véhicules -->
       <template v-else>
-        <!-- Barre de recherche + stats -->
+        <!-- Barre de recherche + filtres -->
         <div class="bg-white rounded-xl border border-gray-100 p-4 space-y-3">
           <div class="flex flex-col sm:flex-row sm:items-center gap-3">
             <div class="relative flex-1">
               <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                v-model="searchQuery"
-                type="text"
+              <input v-model="searchQuery" type="text"
                 placeholder="Rechercher par immatriculation, chauffeur, matricule..."
-                class="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-colors"
-              />
+                class="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-colors" />
             </div>
             <span class="font-mono font-semibold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg text-sm">
               {{ vehiculesFiltres.length }} véhicule(s)
             </span>
           </div>
-          <!-- Filtre Jour / Nuit -->
           <div class="flex items-center gap-2">
-            <button
-              type="button"
-              @click="filtreEquipe = 'TOUS'"
+            <button type="button" @click="filtreEquipe = 'TOUS'"
               class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer"
-              :class="filtreEquipe === 'TOUS'
-                ? 'bg-gray-900 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
-            >
+              :class="filtreEquipe === 'TOUS' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'">
               Tous ({{ vehiculesDuJour.length }})
             </button>
-            <button
-              type="button"
-              @click="filtreEquipe = 'NUIT'"
+            <button type="button" @click="filtreEquipe = 'NUIT'"
               class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5"
-              :class="filtreEquipe === 'NUIT'
-                ? 'bg-indigo-600 text-white'
-                : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'"
-            >
+              :class="filtreEquipe === 'NUIT' ? 'bg-indigo-600 text-white' : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'">
               <span class="text-sm">🌙</span> Nuit ({{ nbNuit }})
             </button>
-            <button
-              type="button"
-              @click="filtreEquipe = 'JOUR'"
+            <button type="button" @click="filtreEquipe = 'JOUR'"
               class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5"
-              :class="filtreEquipe === 'JOUR'
-                ? 'bg-amber-500 text-white'
-                : 'bg-amber-50 text-amber-700 hover:bg-amber-100'"
-            >
+              :class="filtreEquipe === 'JOUR' ? 'bg-amber-500 text-white' : 'bg-amber-50 text-amber-700 hover:bg-amber-100'">
               <span class="text-sm">☀️</span> Jour ({{ nbJour }})
             </button>
           </div>
         </div>
 
-        <!-- Véhicule sélectionné -->
-        <div v-if="selectedVehicule" class="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-xl border border-emerald-300 p-5 space-y-3">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <Zap class="w-5 h-5 text-emerald-600" />
-              <span class="text-sm font-bold text-emerald-800">Véhicule sélectionné</span>
-            </div>
-            <button
-              type="button"
-              @click="selectedVehicule = null"
-              class="text-xs text-emerald-600 hover:text-emerald-800 font-medium cursor-pointer"
-            >Changer</button>
-          </div>
-          <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-            <div>
-              <p class="text-[11px] text-emerald-600 font-medium">Immatriculation</p>
-              <p class="font-bold text-gray-900 font-mono">{{ selectedVehicule.immatriculation }}</p>
-            </div>
-            <div>
-              <p class="text-[11px] text-emerald-600 font-medium">Matricule / Chauffeur</p>
-              <p class="font-semibold text-gray-900">
-                <span class="font-mono text-xs text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded mr-1">{{ selectedVehicule.code_transporteur }}</span>
-                {{ selectedVehicule.chauffeur }}
-              </p>
-            </div>
-            <div>
-              <p class="text-[11px] text-emerald-600 font-medium">Tonnage</p>
-              <p class="font-bold text-gray-900 font-mono">{{ selectedVehicule.tonnage_tonnes }} t</p>
-            </div>
-            <div>
-              <p class="text-[11px] text-emerald-600 font-medium">Rotations</p>
-              <p class="font-bold text-gray-900 font-mono">{{ selectedVehicule.rotations }}</p>
-            </div>
-            <div>
-              <p class="text-[11px] text-emerald-600 font-medium">Arrondissement</p>
-              <p class="font-semibold text-gray-900">{{ selectedVehicule.arrondissement }}</p>
-            </div>
-            <div>
-              <p class="text-[11px] text-emerald-600 font-medium">Reste à payer</p>
-              <p class="font-bold font-mono" :class="primeColor(estimerPrime(selectedVehicule).scoreGlobal)">
-                {{ estimerPrime(selectedVehicule).primeFinale.toLocaleString() }} F
-              </p>
-              <p class="text-[10px] text-gray-500">
-                Score: {{ estimerPrime(selectedVehicule).scoreGlobal.toFixed(0) }}%
-                · Presence {{ estimerPrime(selectedVehicule).tauxPresence }}%
-              </p>
-            </div>
-          </div>
-          <!-- Barre de dégression prime -->
-          <div class="mt-3 space-y-2">
-            <div class="flex items-center justify-between text-[11px]">
-              <span class="text-gray-500">Plafond : {{ estimerPrime(selectedVehicule).plafond.toLocaleString() }} F</span>
-              <span class="text-red-600 font-semibold" v-if="estimerPrime(selectedVehicule).penalites.total > 0">
-                Pénalités : -{{ estimerPrime(selectedVehicule).penalites.total.toLocaleString() }} F
-              </span>
-              <span class="font-bold" :class="primeColor(estimerPrime(selectedVehicule).scoreGlobal)">
-                Reste à payer : {{ estimerPrime(selectedVehicule).primeFinale.toLocaleString() }} F
-              </span>
-            </div>
-            <!-- Barre : vert = reste à payer, rouge = pénalités -->
-            <div class="w-full h-3 bg-red-200 rounded-full overflow-hidden flex">
-              <div
-                class="h-full rounded-l-full transition-all duration-500"
-                :class="barColor(estimerPrime(selectedVehicule).scoreGlobal)"
-                :style="{ width: (estimerPrime(selectedVehicule).primeFinale / estimerPrime(selectedVehicule).plafond * 100) + '%' }"
-              ></div>
-            </div>
-            <!-- Détail pénalités -->
-            <div class="flex flex-wrap gap-3 text-[10px]">
-              <span :class="estimerPrime(selectedVehicule).penalites.tonnage > 0 ? 'text-red-500' : 'text-emerald-500'">
-                Tonnage (50%): {{ estimerPrime(selectedVehicule).penalites.tonnage > 0 ? '-' + estimerPrime(selectedVehicule).penalites.tonnage.toLocaleString() + ' F' : '✓ OK' }}
-              </span>
-              <span :class="estimerPrime(selectedVehicule).penalites.bouclage > 0 ? 'text-red-500' : 'text-emerald-500'">
-                Bouclage (25%): {{ estimerPrime(selectedVehicule).penalites.bouclage > 0 ? '-' + estimerPrime(selectedVehicule).penalites.bouclage.toLocaleString() + ' F' : '✓ OK' }}
-              </span>
-              <span :class="estimerPrime(selectedVehicule).penalites.entretien > 0 ? 'text-red-500' : 'text-emerald-500'">
-                Entretien (15%): {{ estimerPrime(selectedVehicule).penalites.entretien > 0 ? '-' + estimerPrime(selectedVehicule).penalites.entretien.toLocaleString() + ' F' : '✓ OK' }}
-              </span>
-              <span :class="estimerPrime(selectedVehicule).penalites.qhse > 0 ? 'text-red-500' : 'text-emerald-500'">
-                QHSE (10%): {{ estimerPrime(selectedVehicule).penalites.qhse > 0 ? '-' + estimerPrime(selectedVehicule).penalites.qhse.toLocaleString() + ' F' : '✓ OK' }}
-              </span>
-              <span class="ml-auto" :class="estimerPrime(selectedVehicule).tauxPresence >= 93 ? 'text-emerald-500' : 'text-amber-500'">
-                Presence: {{ estimerPrime(selectedVehicule).tauxPresence }}%
-                {{ estimerPrime(selectedVehicule).prorata ? '(prorata)' : '' }}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Tableau des véhicules du jour -->
-        <div v-if="!selectedVehicule" class="bg-white rounded-xl border border-gray-100 overflow-hidden">
+        <!-- Tableau des véhicules -->
+        <div v-if="!selectedVehicule" class="mt-4 bg-white rounded-xl border border-gray-100 overflow-hidden">
           <div class="overflow-x-auto">
             <table class="w-full text-sm">
               <thead>
@@ -586,53 +379,35 @@ function submit() {
                   <th class="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase">Chauffeur</th>
                   <th class="text-right px-3 py-3 text-xs font-semibold text-gray-500 uppercase">Tonnage</th>
                   <th class="text-right px-3 py-3 text-xs font-semibold text-gray-500 uppercase">Tours</th>
-                  <th class="text-right px-3 py-3 text-xs font-semibold text-gray-500 uppercase">Plafond</th>
-                  <th class="text-right px-3 py-3 text-xs font-semibold text-gray-500 uppercase">Sanctions</th>
-                  <th class="text-right px-3 py-3 text-xs font-semibold text-gray-500 uppercase">Apres sanct.</th>
-                  <th class="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase">Presence</th>
-                  <th class="text-right px-3 py-3 text-xs font-semibold text-red-500 uppercase">Total deduit</th>
+                  <th class="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase">Présence</th>
+                  <th class="text-right px-3 py-3 text-xs font-semibold text-red-500 uppercase">Sanctions</th>
                   <th class="text-right px-3 py-3 text-xs font-semibold text-emerald-600 uppercase">A payer</th>
                   <th class="px-2 py-3"></th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-gray-50">
-                <tr
-                  v-for="v in vehiculesFiltres"
-                  :key="v.immatriculation"
+                <tr v-for="v in vehiculesFiltres" :key="v.immatriculation"
                   class="hover:bg-emerald-50/50 transition-colors cursor-pointer group"
-                  @click="ouvrirFicheAgent(v)"
-                >
+                  @click="selectionnerVehicule(v)">
                   <td class="px-3 py-2.5 font-mono font-semibold text-gray-900 text-xs">{{ v.immatriculation }}</td>
                   <td class="px-3 py-2.5 font-mono text-xs text-gray-500">{{ v.code_transporteur }}</td>
                   <td class="px-3 py-2.5 text-gray-900 text-xs">
                     {{ v.chauffeur }}
-                    <span
-                      class="ml-1 inline-flex px-1 py-0.5 rounded text-[9px] font-bold"
-                      :class="v.equipe === 'NUIT' ? 'bg-indigo-100 text-indigo-700' : 'bg-amber-100 text-amber-700'"
-                    >{{ v.equipe === 'NUIT' ? '🌙' : '☀️' }}</span>
+                    <span class="ml-1 inline-flex px-1 py-0.5 rounded text-[9px] font-bold"
+                      :class="v.equipe === 'NUIT' ? 'bg-indigo-100 text-indigo-700' : 'bg-amber-100 text-amber-700'">
+                      {{ v.equipe === 'NUIT' ? '🌙' : '☀️' }}</span>
                   </td>
                   <td class="px-3 py-2.5 text-right font-mono font-semibold text-gray-900">{{ v.tonnage_tonnes }} t</td>
                   <td class="px-3 py-2.5 text-right font-mono text-gray-700">{{ v.rotations }}</td>
-                  <td class="px-3 py-2.5 text-right font-mono text-xs text-gray-400">{{ plafond.toLocaleString() }}</td>
-                  <td class="px-3 py-2.5 text-right font-mono text-xs font-semibold" :class="estimerPrime(v).penalites.total > 0 ? 'text-red-600' : 'text-gray-300'">
-                    {{ estimerPrime(v).penalites.total > 0 ? '-' + estimerPrime(v).penalites.total.toLocaleString() : '0' }}
-                  </td>
-                  <td class="px-3 py-2.5 text-right font-mono text-xs font-semibold text-gray-700">
-                    {{ estimerPrime(v).primeAvant.toLocaleString() }}
-                  </td>
                   <td class="px-3 py-2.5 text-center">
                     <span class="font-mono text-xs font-bold px-1.5 py-0.5 rounded"
                       :class="v.taux_presence >= 93 ? 'text-emerald-700 bg-emerald-50' : v.taux_presence >= 70 ? 'text-amber-700 bg-amber-50' : 'text-red-700 bg-red-50'">
                       {{ v.taux_presence }}%
                     </span>
-                    <span v-if="estimerPrime(v).prorata" class="block text-[9px] text-amber-600 font-mono font-semibold mt-0.5">
-                      = {{ Math.round(estimerPrime(v).primeAvant * v.taux_presence / 100).toLocaleString() }} F
-                    </span>
                   </td>
-                  <td class="px-3 py-2.5 text-right">
-                    <span class="font-mono text-xs font-bold text-red-600">
-                      -{{ (plafond - estimerPrime(v).primeFinale).toLocaleString() }} F
-                    </span>
+                  <td class="px-3 py-2.5 text-right font-mono text-xs font-semibold"
+                    :class="estimerPrime(v).penalites.total > 0 ? 'text-red-600' : 'text-gray-300'">
+                    {{ estimerPrime(v).penalites.total > 0 ? '-' + estimerPrime(v).penalites.total.toLocaleString() : '0' }}
                   </td>
                   <td class="px-3 py-2.5 text-right">
                     <span class="font-mono text-xs font-bold px-2 py-0.5 rounded" :class="primeColor(estimerPrime(v).scoreGlobal)">
@@ -640,138 +415,19 @@ function submit() {
                     </span>
                   </td>
                   <td class="px-2 py-2.5">
-                    <ChevronRight class="w-4 h-4 text-gray-300 group-hover:text-emerald-500 transition-colors" />
+                    <Truck class="w-4 h-4 text-gray-300 group-hover:text-emerald-500 transition-colors" />
                   </td>
                 </tr>
                 <tr v-if="vehiculesFiltres.length === 0">
-                  <td colspan="12" class="px-4 py-8 text-center text-gray-400">
-                    Aucun vehicule trouve pour cette date
-                  </td>
+                  <td colspan="9" class="px-4 py-8 text-center text-gray-400">Aucun véhicule trouvé pour cette date</td>
                 </tr>
               </tbody>
             </table>
-
-          </div>
-        </div>
-
-        <!-- ══ FICHE DÉTAILLÉE AGENT (historique mensuel 21→20) ══ -->
-        <div v-if="ficheAgent" id="fiche-agent-detail" class="bg-white rounded-xl border border-blue-200 overflow-hidden">
-          <!-- Header fiche -->
-          <div class="px-5 py-4 bg-blue-50 border-b border-blue-200 flex items-center justify-between">
-            <div>
-              <h3 class="text-sm font-bold text-blue-900">
-                Fiche Tonnage Mensuel —
-                <span class="font-mono">{{ ficheAgent.code_transporteur }}</span>
-                {{ ficheAgent.chauffeur }}
-              </h3>
-              <p class="text-xs text-blue-600 mt-0.5">
-                Vehicule {{ ficheAgent.immatriculation }} · {{ ficheAgent.equipe === 'NUIT' ? '🌙 Nuit' : '☀️ Jour' }}
-                · Periode {{ bilanMensuel?.periode || '' }}
-              </p>
-            </div>
-            <button @click="fermerFicheAgent" class="p-2 rounded-lg hover:bg-blue-100 transition-colors cursor-pointer">
-              <span class="text-blue-600 text-sm font-bold">✕</span>
-            </button>
-          </div>
-
-          <!-- Résumé prime -->
-          <div class="px-5 py-3 bg-blue-50/30 border-b border-blue-100 flex flex-wrap items-center gap-6 text-xs">
-            <div>
-              <span class="text-gray-500">Plafond</span>
-              <p class="font-mono font-bold text-gray-700">{{ ficheAgent.plafond.toLocaleString() }} F</p>
-            </div>
-            <div class="text-lg text-gray-300">−</div>
-            <div>
-              <span class="text-gray-500">Sanctions cumulees</span>
-              <p class="font-mono font-bold text-red-600">{{ ficheAgent.penalites.total.toLocaleString() }} F</p>
-            </div>
-            <div class="text-lg text-gray-300">=</div>
-            <div>
-              <span class="text-gray-500">Apres sanctions</span>
-              <p class="font-mono font-bold text-gray-700">{{ ficheAgent.prime_avant_presence.toLocaleString() }} F</p>
-            </div>
-            <div v-if="ficheAgent.prorata">
-              <span class="text-gray-500">× Presence {{ ficheAgent.taux_presence }}%</span>
-            </div>
-            <div class="text-lg text-gray-300">=</div>
-            <div>
-              <span class="text-emerald-600 font-semibold">A payer</span>
-              <p class="font-mono font-bold text-emerald-700 text-sm">{{ ficheAgent.prime_finale.toLocaleString() }} F</p>
-            </div>
-            <div class="ml-auto">
-              <span class="text-gray-500">Total deduit</span>
-              <p class="font-mono font-bold text-red-600">-{{ (ficheAgent.plafond - ficheAgent.prime_finale).toLocaleString() }} F</p>
-            </div>
-          </div>
-
-          <!-- Tableau jour par jour -->
-          <div class="overflow-x-auto">
-            <table class="w-full text-sm">
-              <thead>
-                <tr class="bg-gray-50 border-b border-gray-100">
-                  <th class="text-center px-3 py-2 text-xs font-semibold text-gray-500">Jour</th>
-                  <th class="text-right px-3 py-2 text-xs font-semibold text-gray-500">Tonnage</th>
-                  <th class="text-right px-3 py-2 text-xs font-semibold text-gray-500">Rotations</th>
-                  <th class="text-right px-3 py-2 text-xs font-semibold text-gray-500">Moyenne</th>
-                  <th class="text-center px-3 py-2 text-xs font-semibold text-gray-500">Score</th>
-                  <th class="text-right px-3 py-2 text-xs font-semibold text-gray-500">Penalite</th>
-                  <th class="text-left px-3 py-2 text-xs font-semibold text-gray-500">Destination</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-gray-50">
-                <tr v-for="j in ficheAgent.detail_jours" :key="j.jour" class="hover:bg-gray-50/50">
-                  <td class="px-3 py-2 text-center font-mono text-xs font-bold text-gray-700">J{{ j.jour }}</td>
-                  <td class="px-3 py-2 text-right font-mono text-xs font-semibold text-gray-900">{{ j.tonnage_tonnes }} t</td>
-                  <td class="px-3 py-2 text-right font-mono text-xs text-gray-700">{{ j.rotations }}</td>
-                  <td class="px-3 py-2 text-right font-mono text-xs text-gray-700">{{ j.moyenne }} t/rot</td>
-                  <td class="px-3 py-2 text-center">
-                    <span class="font-mono text-xs font-bold px-1.5 py-0.5 rounded"
-                      :class="j.score >= 75 ? 'text-emerald-700 bg-emerald-50' : j.score >= 50 ? 'text-amber-700 bg-amber-50' : 'text-red-700 bg-red-50'">
-                      {{ j.score }}%
-                    </span>
-                  </td>
-                  <td class="px-3 py-2 text-right font-mono text-xs" :class="j.penalite > 0 ? 'text-red-600 font-semibold' : 'text-gray-300'">
-                    {{ j.penalite > 0 ? '-' + j.penalite.toLocaleString() + ' F' : '0' }}
-                  </td>
-                  <td class="px-3 py-2 text-xs text-gray-500 truncate max-w-[150px]">{{ j.destination }}</td>
-                </tr>
-              </tbody>
-              <tfoot>
-                <tr class="bg-gray-50 border-t-2 border-gray-200 font-bold text-xs">
-                  <td class="px-3 py-2 text-center text-gray-700">{{ ficheAgent.detail_jours.length }} jours</td>
-                  <td class="px-3 py-2 text-right font-mono text-gray-900">
-                    {{ ficheAgent.detail_jours.reduce((s, j) => s + j.tonnage_tonnes, 0).toFixed(2) }} t
-                  </td>
-                  <td class="px-3 py-2 text-right font-mono text-gray-700">
-                    {{ ficheAgent.detail_jours.reduce((s, j) => s + j.rotations, 0) }}
-                  </td>
-                  <td class="px-3 py-2 text-right font-mono text-gray-700">
-                    {{ ficheAgent.detail_jours.length > 0 ? (ficheAgent.detail_jours.reduce((s, j) => s + j.tonnage_tonnes, 0) / ficheAgent.detail_jours.reduce((s, j) => s + j.rotations, 0)).toFixed(1) : '0' }} t/rot
-                  </td>
-                  <td class="px-3 py-2 text-center">—</td>
-                  <td class="px-3 py-2 text-right font-mono text-red-600">
-                    -{{ ficheAgent.penalites.total.toLocaleString() }} F
-                  </td>
-                  <td class="px-3 py-2"></td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-
-          <!-- Bouton sélectionner pour passer aux ripeurs -->
-          <div class="px-5 py-3 bg-gray-50 border-t border-gray-100 flex justify-between items-center">
-            <button @click="fermerFicheAgent" class="text-xs text-gray-500 hover:text-gray-700 cursor-pointer">
-              Retour a la liste
-            </button>
-            <BaseButton @click="() => { const v = vehiculesDuJour.find(vv => vv.code_transporteur == ficheAgent?.code_transporteur); ficheAgent = null; if (v) selectionnerVehicule(v) }" variant="primary" type="button">
-              Selectionner ce vehicule
-              <ChevronRight class="w-4 h-4 ml-1.5" />
-            </BaseButton>
           </div>
         </div>
 
         <!-- Résumé global -->
-        <div class="bg-white rounded-xl border border-gray-100 px-4 py-3">
+        <div class="mt-4 bg-white rounded-xl border border-gray-100 px-4 py-3">
           <div class="flex flex-wrap items-center gap-6 text-xs">
             <div>
               <span class="text-gray-500">Budget total</span>
@@ -784,312 +440,242 @@ function submit() {
             </div>
             <div class="text-lg text-gray-300">=</div>
             <div>
-              <span class="text-gray-500">Total a payer</span>
+              <span class="text-gray-500">Total à payer</span>
               <p class="font-mono font-bold text-emerald-700 text-sm">{{ vehiculesFiltres.reduce((s, v) => s + (v.prime_finale ?? 0), 0).toLocaleString() }} F</p>
             </div>
             <div class="ml-auto text-right">
-              <span class="text-gray-400">{{ vehiculesFiltres.length }} agents · Plafond {{ plafond.toLocaleString() }} F · Presence {{ seuilPresence }}%</span>
+              <span class="text-gray-400">{{ vehiculesFiltres.length }} agents · Plafond {{ plafond.toLocaleString() }} F · Présence {{ seuilPresence }}%</span>
             </div>
           </div>
         </div>
 
-        <div v-if="selectedVehicule" class="flex justify-end">
-          <BaseButton @click="nextStep" variant="primary" type="button">
-            Suivant — Ripeurs
-            <ChevronRight class="w-4 h-4 ml-1.5" />
-          </BaseButton>
-        </div>
-      </template>
-    </div>
+        <!-- ═══ FORMULAIRE ÉQUIPE (s'affiche quand un véhicule est sélectionné) ═══ -->
+        <div v-if="selectedVehicule" id="formulaire-equipe" class="mt-6 space-y-5">
 
-    <!-- ═══ ÉTAPE 2 : RIPEURS (saisie manuelle) ═══ -->
-    <div v-show="activeStep === 'ripeur'" class="space-y-6" :class="{ 'opacity-60 pointer-events-none': readOnly }">
-      <div class="bg-white rounded-xl border border-gray-100 p-6 space-y-6">
-        <div class="flex items-center gap-3 mb-2">
-          <div class="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center">
-            <Users class="w-5 h-5 text-blue-600" />
-          </div>
-          <div>
-            <h3 class="text-sm font-semibold text-gray-900">Ripeurs de l'équipe</h3>
-            <p class="text-xs text-gray-500">Seule saisie manuelle — le reste vient du pont-bascule</p>
-          </div>
-        </div>
-
-        <!-- Rappel véhicule/chauffeur -->
-        <div v-if="selectedVehicule" class="rounded-xl bg-gray-50 border border-gray-200 p-4 grid grid-cols-2 sm:grid-cols-5 gap-3 text-sm">
-          <div>
-            <p class="text-[11px] text-gray-400">Matricule / Chauffeur</p>
-            <p class="font-semibold text-gray-900">
-              <span class="font-mono text-xs text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded mr-1">{{ selectedVehicule.code_transporteur }}</span>
-              {{ selectedVehicule.chauffeur }}
-            </p>
-          </div>
-          <div>
-            <p class="text-[11px] text-gray-400">Véhicule</p>
-            <p class="font-semibold text-gray-900 font-mono">{{ selectedVehicule.immatriculation }}</p>
-          </div>
-          <div>
-            <p class="text-[11px] text-gray-400">Tonnage</p>
-            <p class="font-semibold text-gray-900 font-mono">{{ selectedVehicule.tonnage_tonnes }} t</p>
-          </div>
-          <div>
-            <p class="text-[11px] text-gray-400">Rotations</p>
-            <p class="font-semibold text-gray-900 font-mono">{{ selectedVehicule.rotations }}</p>
-          </div>
-          <div>
-            <p class="text-[11px] text-gray-400">Reste à payer</p>
-            <p class="font-bold font-mono text-xs" :class="primeColor(estimerPrime(selectedVehicule).scoreGlobal)">
-              {{ estimerPrime(selectedVehicule).primeFinale.toLocaleString() }} F
-            </p>
-            <p v-if="estimerPrime(selectedVehicule).penalites.total > 0" class="text-[10px] text-red-500">
-              -{{ estimerPrime(selectedVehicule).penalites.total.toLocaleString() }} F pénalités
-            </p>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div>
-            <AgentSearchInput
-              v-model="ripeur1Matricule"
-              :date="date"
-              :filter-presents="false"
-              label="Ripeur 1 (Nom ou Matricule)"
-              placeholder="Tapez un nom ou un matricule..."
-              required
-              @agent-selected="(a) => selectedRipeur1 = a"
-            />
-          </div>
-          <div>
-            <AgentSearchInput
-              v-model="ripeur2Matricule"
-              :date="date"
-              :filter-presents="false"
-              label="Ripeur 2 (Nom ou Matricule)"
-              placeholder="Tapez un nom ou un matricule..."
-              @agent-selected="(a) => selectedRipeur2 = a"
-            />
-            <p class="text-[11px] text-gray-400 mt-1.5">Optionnel</p>
-          </div>
-          <div>
-            <AgentSearchInput
-              v-model="ripeur3Matricule"
-              :date="date"
-              :filter-presents="false"
-              label="Ripeur 3 (Nom ou Matricule)"
-              placeholder="Tapez un nom ou un matricule..."
-              @agent-selected="(a) => selectedRipeur3 = a"
-            />
-            <p class="text-[11px] text-gray-400 mt-1.5">Optionnel</p>
-          </div>
-        </div>
-
-        <!-- Résumé équipe -->
-        <div v-if="selectedRipeur1" class="rounded-xl bg-gray-50 border border-gray-200 p-4">
-          <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Équipe complète</h4>
-          <div class="flex flex-wrap gap-3">
-            <div v-if="selectedVehicule" class="flex items-center gap-2 px-3 py-2 bg-white border border-emerald-200 rounded-lg">
-              <div class="w-7 h-7 rounded-full bg-emerald-600 flex items-center justify-center text-white text-xs font-bold">{{ selectedVehicule.chauffeur.charAt(0) }}</div>
-              <div>
-                <p class="text-xs font-semibold text-gray-900">{{ selectedVehicule.chauffeur }}</p>
-                <p class="text-[10px] text-emerald-600 font-medium">Chauffeur · Pont-bascule</p>
+          <!-- En-tête véhicule sélectionné -->
+          <div class="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-xl border border-emerald-300 p-5">
+            <div class="flex items-center justify-between mb-4">
+              <div class="flex items-center gap-2">
+                <Truck class="w-5 h-5 text-emerald-600" />
+                <span class="text-sm font-bold text-emerald-800">Véhicule sélectionné</span>
               </div>
+              <button type="button" @click="fermerFormulaire"
+                class="flex items-center gap-1.5 text-xs text-emerald-600 hover:text-red-600 font-medium px-2 py-1 rounded-lg hover:bg-red-50 transition-colors cursor-pointer">
+                <X class="w-3.5 h-3.5" /> Changer
+              </button>
             </div>
-            <div class="flex items-center gap-2 px-3 py-2 bg-white border border-blue-200 rounded-lg">
-              <div class="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold">{{ selectedRipeur1.nom.charAt(0) }}</div>
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
               <div>
-                <p class="text-xs font-semibold text-gray-900">{{ selectedRipeur1.nom }}</p>
-                <p class="text-[10px] text-blue-600 font-medium">Ripeur 1 · {{ selectedRipeur1.matricule }}</p>
-              </div>
-            </div>
-            <div v-if="selectedRipeur2" class="flex items-center gap-2 px-3 py-2 bg-white border border-blue-200 rounded-lg">
-              <div class="w-7 h-7 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold">{{ selectedRipeur2.nom.charAt(0) }}</div>
-              <div>
-                <p class="text-xs font-semibold text-gray-900">{{ selectedRipeur2.nom }}</p>
-                <p class="text-[10px] text-blue-500 font-medium">Ripeur 2 · {{ selectedRipeur2.matricule }}</p>
-              </div>
-            </div>
-            <div v-if="selectedRipeur3" class="flex items-center gap-2 px-3 py-2 bg-white border border-blue-200 rounded-lg">
-              <div class="w-7 h-7 rounded-full bg-blue-400 flex items-center justify-center text-white text-xs font-bold">{{ selectedRipeur3.nom.charAt(0) }}</div>
-              <div>
-                <p class="text-xs font-semibold text-gray-900">{{ selectedRipeur3.nom }}</p>
-                <p class="text-[10px] text-blue-400 font-medium">Ripeur 3 · {{ selectedRipeur3.matricule }}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="flex justify-between">
-        <BaseButton @click="prevStep" variant="outline" type="button">
-          <ChevronLeft class="w-4 h-4 mr-1.5" />
-          Véhicule
-        </BaseButton>
-        <BaseButton @click="nextStep" variant="primary" type="button" :disabled="!selectedRipeur1">
-          Suivant — Validation
-          <ChevronRight class="w-4 h-4 ml-1.5" />
-        </BaseButton>
-      </div>
-    </div>
-
-    <!-- ═══ ÉTAPE 3 : RÉCAPITULATIF & VALIDATION ═══ -->
-    <div v-show="activeStep === 'recap'" class="space-y-6" :class="{ 'opacity-60 pointer-events-none': readOnly }">
-      <div class="bg-white rounded-xl border border-gray-100 p-6 space-y-6">
-        <div class="flex items-center gap-3">
-          <div class="w-9 h-9 rounded-xl bg-purple-50 flex items-center justify-center">
-            <CheckCircle class="w-5 h-5 text-purple-600" />
-          </div>
-          <div>
-            <h3 class="text-sm font-semibold text-gray-900">Récapitulatif de la fiche collecte</h3>
-            <p class="text-xs text-gray-500">Vérifiez les informations avant validation</p>
-          </div>
-        </div>
-
-        <div v-if="selectedVehicule" class="space-y-4">
-          <!-- Données pont-bascule -->
-          <div class="rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 p-5">
-            <h4 class="text-xs font-semibold text-emerald-600 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-              <Zap class="w-3.5 h-3.5" /> Données pont-bascule (automatiques)
-            </h4>
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
-              <div>
-                <p class="text-[11px] text-emerald-600">Immatriculation</p>
+                <p class="text-[11px] text-emerald-600 font-medium">N° Parc / Immat.</p>
                 <p class="font-bold text-gray-900 font-mono">{{ selectedVehicule.immatriculation }}</p>
               </div>
               <div>
-                <p class="text-[11px] text-emerald-600">Matricule chauffeur</p>
-                <p class="font-mono font-bold text-emerald-700">{{ selectedVehicule.code_transporteur }}</p>
+                <p class="text-[11px] text-emerald-600 font-medium">Chauffeur</p>
+                <p class="font-semibold text-gray-900">
+                  <span class="font-mono text-xs text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded mr-1">{{ selectedVehicule.code_transporteur }}</span>
+                  {{ selectedVehicule.chauffeur }}
+                </p>
               </div>
               <div>
-                <p class="text-[11px] text-emerald-600">Chauffeur</p>
-                <p class="font-semibold text-gray-900">{{ selectedVehicule.chauffeur }}</p>
+                <p class="text-[11px] text-emerald-600 font-medium">Tonnage</p>
+                <p class="font-bold text-gray-900 font-mono">{{ selectedVehicule.tonnage_tonnes }} t</p>
               </div>
               <div>
-                <p class="text-[11px] text-emerald-600">Arrondissement</p>
+                <p class="text-[11px] text-emerald-600 font-medium">Rotations</p>
+                <p class="font-bold text-gray-900 font-mono">{{ selectedVehicule.rotations }}</p>
+              </div>
+              <div>
+                <p class="text-[11px] text-emerald-600 font-medium">Arrondissement</p>
                 <p class="font-semibold text-gray-900">{{ selectedVehicule.arrondissement }}</p>
               </div>
               <div>
-                <p class="text-[11px] text-emerald-600">Tonnage</p>
-                <p class="font-bold text-gray-900 font-mono text-lg">{{ selectedVehicule.tonnage_tonnes }} t</p>
+                <p class="text-[11px] text-emerald-600 font-medium">Reste à payer</p>
+                <p class="font-bold font-mono" :class="primeColor(estimerPrime(selectedVehicule).scoreGlobal)">
+                  {{ estimerPrime(selectedVehicule).primeFinale.toLocaleString() }} F
+                </p>
+              </div>
+            </div>
+            <!-- Barre dégression -->
+            <div class="mt-3">
+              <div class="w-full h-2.5 bg-red-200 rounded-full overflow-hidden flex">
+                <div class="h-full rounded-l-full transition-all duration-500"
+                  :class="barColor(estimerPrime(selectedVehicule).scoreGlobal)"
+                  :style="{ width: (estimerPrime(selectedVehicule).primeFinale / estimerPrime(selectedVehicule).plafond * 100) + '%' }"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bouton + panneau historique équipages -->
+          <div class="bg-white rounded-xl border border-gray-100 overflow-hidden">
+            <button type="button" @click="historiqueOuvert = !historiqueOuvert"
+              class="w-full flex items-center justify-between px-5 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer">
+              <span class="flex items-center gap-2">
+                <Users class="w-4 h-4 text-gray-400" />
+                Historique des équipages de ce véhicule
+                <span v-if="historiqueVehicule.length > 0" class="text-xs text-gray-400 font-mono">({{ historiqueVehicule.length }})</span>
+              </span>
+              <ChevronRight class="w-4 h-4 text-gray-400 transition-transform" :class="{ 'rotate-90': historiqueOuvert }" />
+            </button>
+            <div v-if="historiqueOuvert" class="border-t border-gray-100">
+              <div v-if="historiqueLoading" class="p-4 flex items-center gap-2 text-sm text-gray-500">
+                <Loader2 class="w-4 h-4 animate-spin" /> Chargement...
+              </div>
+              <div v-else-if="historiqueVehicule.length === 0" class="p-4 text-sm text-gray-400 text-center">
+                Aucune saisie précédente pour ce véhicule
+              </div>
+              <div v-else class="overflow-x-auto">
+                <table class="w-full text-xs">
+                  <thead>
+                    <tr class="bg-gray-50 border-b border-gray-100">
+                      <th class="text-left px-3 py-2 font-semibold text-gray-500">Date</th>
+                      <th class="text-left px-3 py-2 font-semibold text-gray-500">Chauffeur</th>
+                      <th class="text-left px-3 py-2 font-semibold text-gray-500">Ripeur 1</th>
+                      <th class="text-left px-3 py-2 font-semibold text-gray-500">Ripeur 2</th>
+                      <th class="text-left px-3 py-2 font-semibold text-gray-500">Circuit</th>
+                      <th class="text-right px-3 py-2 font-semibold text-gray-500">Tonnage</th>
+                      <th class="text-center px-3 py-2 font-semibold text-gray-500">Service</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-gray-50">
+                    <tr v-for="(h, i) in historiqueVehicule" :key="i" class="hover:bg-gray-50/50">
+                      <td class="px-3 py-2 font-mono text-gray-700">{{ h.date.split('-').reverse().join('/') }}</td>
+                      <td class="px-3 py-2 text-gray-900">{{ h.chauffeur_nom || '-' }}</td>
+                      <td class="px-3 py-2 text-gray-700">{{ h.ripeur1_nom || '-' }}</td>
+                      <td class="px-3 py-2 text-gray-700">{{ h.ripeur2_nom || '-' }}</td>
+                      <td class="px-3 py-2 text-gray-600">{{ h.circuit || '-' }}</td>
+                      <td class="px-3 py-2 text-right font-mono font-semibold text-gray-900">{{ h.tonnage }} t</td>
+                      <td class="px-3 py-2 text-center">
+                        <span class="px-1.5 py-0.5 rounded text-[10px] font-bold"
+                          :class="h.service === 'TRI' ? 'bg-teal-100 text-teal-700' : 'bg-emerald-100 text-emerald-700'">
+                          {{ h.service }}
+                        </span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Suggestion équipe (non pré-remplie) -->
+          <div v-if="equipeLoading" class="flex items-center gap-3 p-4 bg-blue-50 rounded-xl border border-blue-100">
+            <Loader2 class="w-5 h-5 text-blue-500 animate-spin" />
+            <span class="text-sm text-blue-700">Recherche de la dernière équipe connue...</span>
+          </div>
+
+          <div v-if="equipeSuggestion && !equipeAcceptee" class="rounded-xl bg-blue-50 border border-blue-200 p-4 space-y-3">
+            <div class="flex items-center gap-2">
+              <Users class="w-4 h-4 text-blue-600" />
+              <span class="text-sm font-semibold text-blue-800">Dernière équipe connue pour ce véhicule</span>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <span v-if="equipeSuggestion.ripeur1_nom" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-blue-200 rounded-lg text-xs font-medium text-gray-800">
+                <div class="w-5 h-5 rounded-full bg-blue-600 flex items-center justify-center text-white text-[10px] font-bold">{{ equipeSuggestion.ripeur1_nom.charAt(0) }}</div>
+                {{ equipeSuggestion.ripeur1_nom }}
+              </span>
+              <span v-if="equipeSuggestion.ripeur2_nom" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-blue-200 rounded-lg text-xs font-medium text-gray-800">
+                <div class="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center text-white text-[10px] font-bold">{{ equipeSuggestion.ripeur2_nom.charAt(0) }}</div>
+                {{ equipeSuggestion.ripeur2_nom }}
+              </span>
+              <span v-if="equipeSuggestion.ripeur3_nom" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-blue-200 rounded-lg text-xs font-medium text-gray-800">
+                <div class="w-5 h-5 rounded-full bg-blue-400 flex items-center justify-center text-white text-[10px] font-bold">{{ equipeSuggestion.ripeur3_nom.charAt(0) }}</div>
+                {{ equipeSuggestion.ripeur3_nom }}
+              </span>
+              <span v-if="equipeSuggestion.circuit" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-600">
+                <Route class="w-3.5 h-3.5 text-gray-400" /> {{ equipeSuggestion.circuit }}
+              </span>
+            </div>
+            <button type="button" @click="appliquerEquipe(equipeSuggestion)"
+              class="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-colors cursor-pointer">
+              <Users class="w-4 h-4" /> Reprendre cette équipe
+            </button>
+          </div>
+
+          <!-- Formulaire Ripeurs + Circuit -->
+          <div class="bg-white rounded-xl border border-gray-100 p-6 space-y-6">
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center">
+                <Users class="w-5 h-5 text-blue-600" />
               </div>
               <div>
-                <p class="text-[11px] text-emerald-600">Rotations</p>
-                <p class="font-bold text-gray-900 font-mono text-lg">{{ selectedVehicule.rotations }}</p>
+                <h3 class="text-sm font-semibold text-gray-900">Ripeurs + Circuit</h3>
+                <p class="text-xs text-gray-500">Saisie manuelle — les chauffeurs sont exclus de la liste</p>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <AgentSearchInput v-model="ripeur1Matricule" :date="date" :filter-presents="false"
+                exclude-role="CHAUFFEUR"
+                label="Ripeur 1 (obligatoire)" placeholder="Rechercher un ripeur..." required
+                @agent-selected="(a) => selectedRipeur1 = a" />
+              <div>
+                <AgentSearchInput v-model="ripeur2Matricule" :date="date" :filter-presents="false"
+                  exclude-role="CHAUFFEUR"
+                  label="Ripeur 2 (optionnel)" placeholder="Rechercher un ripeur..."
+                  @agent-selected="(a) => selectedRipeur2 = a" />
+                <p class="text-[11px] text-gray-400 mt-1.5">Optionnel</p>
               </div>
               <div>
-                <p class="text-[11px] text-emerald-600">Origine</p>
-                <p class="font-semibold text-gray-900">{{ selectedVehicule.origine }}</p>
+                <AgentSearchInput v-model="ripeur3Matricule" :date="date" :filter-presents="false"
+                  exclude-role="CHAUFFEUR"
+                  label="Ripeur 3 (optionnel)" placeholder="Rechercher un ripeur..."
+                  @agent-selected="(a) => selectedRipeur3 = a" />
+                <p class="text-[11px] text-gray-400 mt-1.5">Optionnel</p>
               </div>
-              <div class="sm:col-span-2">
-                <p class="text-[11px] text-emerald-600">Prime (dégression par pénalités)</p>
-                <div class="flex items-baseline gap-3 mt-1">
-                  <div>
-                    <p class="text-[10px] text-gray-500">Plafond</p>
-                    <p class="font-bold font-mono text-lg text-gray-400">{{ estimerPrime(selectedVehicule).plafond.toLocaleString() }} F</p>
-                  </div>
-                  <span class="text-red-400 text-lg">−</span>
-                  <div>
-                    <p class="text-[10px] text-red-500">Pénalités</p>
-                    <p class="font-bold font-mono text-lg text-red-600">{{ estimerPrime(selectedVehicule).penalites.total.toLocaleString() }} F</p>
-                  </div>
-                  <span class="text-gray-300 text-lg">=</span>
-                  <div>
-                    <p class="text-[10px] text-gray-500">Reste à payer</p>
-                    <p class="font-bold font-mono text-lg" :class="primeColor(estimerPrime(selectedVehicule).scoreGlobal)">
-                      {{ estimerPrime(selectedVehicule).primeFinale.toLocaleString() }} F
-                    </p>
-                  </div>
-                </div>
-                <div class="flex flex-wrap gap-2 mt-2 text-[10px]">
-                  <span class="px-1.5 py-0.5 rounded" :class="estimerPrime(selectedVehicule).penalites.tonnage > 0 ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'">
-                    Tonnage: {{ estimerPrime(selectedVehicule).penalites.tonnage > 0 ? '-' + estimerPrime(selectedVehicule).penalites.tonnage.toLocaleString() : '✓' }}
-                  </span>
-                  <span class="px-1.5 py-0.5 rounded" :class="estimerPrime(selectedVehicule).penalites.bouclage > 0 ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'">
-                    Bouclage: {{ estimerPrime(selectedVehicule).penalites.bouclage > 0 ? '-' + estimerPrime(selectedVehicule).penalites.bouclage.toLocaleString() : '✓' }}
-                  </span>
-                  <span class="px-1.5 py-0.5 rounded" :class="estimerPrime(selectedVehicule).penalites.entretien > 0 ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'">
-                    Entretien: {{ estimerPrime(selectedVehicule).penalites.entretien > 0 ? '-' + estimerPrime(selectedVehicule).penalites.entretien.toLocaleString() : '✓' }}
-                  </span>
-                  <span class="px-1.5 py-0.5 rounded" :class="estimerPrime(selectedVehicule).penalites.qhse > 0 ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'">
-                    QHSE: {{ estimerPrime(selectedVehicule).penalites.qhse > 0 ? '-' + estimerPrime(selectedVehicule).penalites.qhse.toLocaleString() : '✓' }}
-                  </span>
-                  <span class="px-1.5 py-0.5 rounded" :class="estimerPrime(selectedVehicule).tauxPresence >= 93 ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'">
-                    Presence: {{ estimerPrime(selectedVehicule).tauxPresence }}%
-                    {{ estimerPrime(selectedVehicule).prorata ? '(prorata)' : '✓' }}
-                  </span>
-                </div>
-              </div>
+            </div>
+
+            <!-- Circuit -->
+            <div class="space-y-1.5">
+              <label class="flex items-center gap-1.5 text-sm font-medium text-gray-700">
+                <Route class="w-3.5 h-3.5 text-gray-400" /> Circuit / Secteur
+              </label>
+              <input v-model="circuitSaisi" type="text"
+                :placeholder="selectedVehicule?.origine || 'Ex: 1er Arrondissement, Akébé, PK5...'"
+                class="block w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-colors" />
             </div>
           </div>
 
-          <!-- Ripeurs (saisie manuelle) -->
-          <div class="rounded-xl bg-blue-50 border border-blue-200 p-5">
-            <h4 class="text-xs font-semibold text-blue-600 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-              <Users class="w-3.5 h-3.5" /> Ripeurs (saisie manuelle)
-            </h4>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-              <div v-if="selectedRipeur1">
-                <p class="text-[11px] text-blue-600">Ripeur 1</p>
-                <p class="font-semibold text-gray-900">{{ selectedRipeur1.nom }}</p>
-                <p class="text-xs text-gray-500">{{ selectedRipeur1.matricule }}</p>
-              </div>
-              <div v-if="selectedRipeur2">
-                <p class="text-[11px] text-blue-600">Ripeur 2</p>
-                <p class="font-semibold text-gray-900">{{ selectedRipeur2.nom }}</p>
-                <p class="text-xs text-gray-500">{{ selectedRipeur2.matricule }}</p>
-              </div>
-              <div v-if="selectedRipeur3">
-                <p class="text-[11px] text-blue-600">Ripeur 3</p>
-                <p class="font-semibold text-gray-900">{{ selectedRipeur3.nom }}</p>
-                <p class="text-xs text-gray-500">{{ selectedRipeur3.matricule }}</p>
-              </div>
+          <!-- Résumé équipe (visible uniquement si ripeur 1 saisi) -->
+          <div v-if="selectedRipeur1" class="bg-white rounded-xl border border-emerald-200 p-5 space-y-3">
+            <div class="flex items-center gap-2">
+              <CheckCircle class="w-4 h-4 text-emerald-600" />
+              <span class="text-sm font-semibold text-gray-900">Équipe complète</span>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-50 border border-emerald-200 rounded-lg text-xs font-medium">
+                <div class="w-5 h-5 rounded-full bg-emerald-600 flex items-center justify-center text-white text-[10px] font-bold">{{ selectedVehicule.chauffeur.charAt(0) }}</div>
+                {{ selectedVehicule.chauffeur }} <span class="text-emerald-500 text-[10px]">Chauffeur</span>
+              </span>
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-50 border border-blue-200 rounded-lg text-xs font-medium">
+                <div class="w-5 h-5 rounded-full bg-blue-600 flex items-center justify-center text-white text-[10px] font-bold">{{ selectedRipeur1.nom.charAt(0) }}</div>
+                {{ selectedRipeur1.nom }} <span class="text-blue-500 text-[10px]">R1</span>
+              </span>
+              <span v-if="selectedRipeur2" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-50 border border-blue-200 rounded-lg text-xs font-medium">
+                <div class="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center text-white text-[10px] font-bold">{{ selectedRipeur2.nom.charAt(0) }}</div>
+                {{ selectedRipeur2.nom }} <span class="text-blue-400 text-[10px]">R2</span>
+              </span>
+              <span v-if="selectedRipeur3" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-50 border border-blue-200 rounded-lg text-xs font-medium">
+                <div class="w-5 h-5 rounded-full bg-blue-400 flex items-center justify-center text-white text-[10px] font-bold">{{ selectedRipeur3.nom.charAt(0) }}</div>
+                {{ selectedRipeur3.nom }} <span class="text-blue-300 text-[10px]">R3</span>
+              </span>
+              <span v-if="circuitSaisi" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-medium text-gray-600">
+                <Route class="w-3.5 h-3.5" /> {{ circuitSaisi }}
+              </span>
             </div>
           </div>
 
-          <!-- Score estimé -->
-          <div
-            v-if="scoreEstime"
-            class="rounded-xl border p-5 transition-all duration-300"
-            :class="[scoreEstime.bg, scoreEstime.border]"
-          >
-            <div class="flex items-center justify-between">
-              <div class="flex items-center gap-2">
-                <Gauge class="w-4 h-4" :class="scoreEstime.color" />
-                <h4 class="text-sm font-semibold text-gray-900">Score journalier estimé</h4>
-              </div>
-              <div class="text-right">
-                <p class="text-3xl font-bold font-mono tracking-tight" :class="scoreEstime.color">{{ scoreEstime.score }} %</p>
-                <p class="text-xs font-semibold uppercase tracking-wider" :class="scoreEstime.color">{{ scoreEstime.label }}</p>
-              </div>
-            </div>
+          <!-- Boutons Retour + Valider (toujours visibles) -->
+          <div class="flex justify-between items-center bg-white rounded-xl border border-gray-100 px-5 py-4">
+            <button type="button" @click="fermerFormulaire"
+              class="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 cursor-pointer">
+              <ArrowLeft class="w-4 h-4" /> Retour à la liste
+            </button>
+            <BaseButton @click="submit" variant="primary" type="button" :disabled="!selectedRipeur1">
+              <CheckCircle class="w-4 h-4 mr-1.5" /> Valider la fiche collecte
+            </BaseButton>
           </div>
-
-          <!-- Détail pesées -->
-          <details class="text-xs rounded-xl bg-gray-50 border border-gray-200 p-4">
-            <summary class="cursor-pointer text-gray-600 hover:text-gray-800 font-medium">
-              Détail des {{ selectedVehicule.pesees.length }} pesée(s) pont-bascule
-            </summary>
-            <div class="mt-3 space-y-1">
-              <div v-for="(p, i) in selectedVehicule.pesees" :key="i" class="flex items-center gap-3 px-3 py-2 bg-white rounded-lg">
-                <span class="text-gray-400 w-4 text-right">#{{ i + 1 }}</span>
-                <span class="font-mono font-semibold text-gray-900">{{ (p.poids_net / 1000).toFixed(2) }} t</span>
-                <span class="text-gray-500">{{ p.origine }} → {{ p.destination }}</span>
-                <span class="ml-auto text-gray-400">Ticket {{ p.no_ticket }}</span>
-              </div>
-            </div>
-          </details>
         </div>
-      </div>
-
-      <div class="flex justify-between">
-        <BaseButton @click="prevStep" variant="outline" type="button">
-          <ChevronLeft class="w-4 h-4 mr-1.5" />
-          Ripeurs
-        </BaseButton>
-        <BaseButton @click="submit" variant="primary" type="button">
-          <CheckCircle class="w-4 h-4 mr-1.5" />
-          Enregistrer la fiche collecte
-        </BaseButton>
-      </div>
+      </template>
     </div>
   </div>
 </template>

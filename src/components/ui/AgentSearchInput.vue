@@ -8,6 +8,7 @@ const props = defineProps({
   date: { type: String, default: '' },
   filterPresents: { type: Boolean, default: false },
   serviceFilter: { type: String, default: '' },
+  excludeRole: { type: String, default: '' },
   label: { type: String, default: 'Agent (Matricule ou Nom)' },
   required: { type: Boolean, default: false },
   placeholder: { type: String, default: 'Tapez un matricule ou un nom...' },
@@ -30,6 +31,11 @@ const results = computed(() => {
   // Filtrer par service si demandé (ex: 'TRI', 'COLLECTE')
   if (props.serviceFilter) {
     list = list.filter(a => a.service === props.serviceFilter)
+  }
+
+  // Exclure un rôle (ex: 'CHAUFFEUR' pour ne garder que les ripeurs)
+  if (props.excludeRole) {
+    list = list.filter(a => a.role !== props.excludeRole)
   }
 
   // Si on filtre par présence et qu'une date est définie

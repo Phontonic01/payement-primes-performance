@@ -1,0 +1,25 @@
+[Unit]
+Description=Clean Africa - Prime de Performance
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/cleanAfrica-primes
+ExecStart=/usr/bin/node server/index.js
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+EnvironmentFile=/opt/cleanAfrica-primes/.env
+
+# Logs
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cleanAfrica-primes
+
+# Sécurité
+User=cleanAfrica
+Group=cleanAfrica
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

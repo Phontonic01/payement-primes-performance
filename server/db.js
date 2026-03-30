@@ -224,6 +224,24 @@ const SCHEMA = `
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
+  CREATE TABLE IF NOT EXISTS equipes_vehicule (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    immatriculation TEXT NOT NULL,
+    service TEXT NOT NULL CHECK(service IN ('COLLECTE','TRI')),
+    chauffeur_matricule TEXT DEFAULT '',
+    chauffeur_nom TEXT DEFAULT '',
+    ripeur1_matricule TEXT DEFAULT '',
+    ripeur1_nom TEXT DEFAULT '',
+    ripeur2_matricule TEXT DEFAULT '',
+    ripeur2_nom TEXT DEFAULT '',
+    ripeur3_matricule TEXT DEFAULT '',
+    ripeur3_nom TEXT DEFAULT '',
+    circuit TEXT DEFAULT '',
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(immatriculation, service)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_equipes_immat ON equipes_vehicule(immatriculation);
   CREATE INDEX IF NOT EXISTS idx_pb_mapping_matricule ON pont_bascule_mapping(matricule_rh);
   CREATE INDEX IF NOT EXISTS idx_agents_matricule ON agents(matricule);
   CREATE INDEX IF NOT EXISTS idx_agents_service ON agents(service);

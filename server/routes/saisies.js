@@ -177,6 +177,74 @@ router.post('/tri', (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
+// ═══ HISTORIQUE ÉQUIPAGES PAR VÉHICULE ═══
+
+router.get('/historique-vehicule/:immatriculation', (req, res) => {
+  const immat = req.params.immatriculation
+  // Fiches collecte
+  const fiches = db.prepare(`
+    SELECT date, chauffeur_matricule, chauffeur_nom, ripeur1_matricule, ripeur1_nom,
+      ripeur2_matricule, ripeur2_nom, circuit, tonnage, rotations, 'COLLECTE' as service
+    FROM fiches_collecte WHERE immatriculation = ?
+    ORDER BY date DESC LIMIT 30
+  `).all(immat)
+
+  // Saisies TRI
+  const tri = db.prepare(`
+    SELECT date, chauffeur_matricule, chauffeur_nom, ripeur1_matricule, ripeur1_nom,
+      ripeur2_matricule, ripeur2_nom, ripeur3_matricule, ripeur3_nom,
+      arrondissement as circuit, tonnage_collecte as tonnage, rotations, 'TRI' as service
+    FROM tri_saisies WHERE immatriculation = ?
+    ORDER BY date DESC LIMIT 30
+  `).all(immat)
+
+  // Fusionner et trier par date desc
+  const all = [...fiches, ...tri].sort((a, b) => b.date.localeCompare(a.date))
+  res.json(all)
+})
+
+// ═══ ÉQUIPES VÉHICULE (mémoire dernière composition) ═══
+
+router.get('/equipe/:immatriculation', (req, res) => {
+  const { service } = req.query
+  let sql = 'SELECT * FROM equipes_vehicule WHERE immatriculation = ?'
+  const params = [req.params.immatriculation]
+  if (service) { sql += ' AND service = ?'; params.push(service) }
+  const equipe = db.prepare(sql).get(...params)
+  res.json(equipe || null)
+})
+
+router.post('/equipe', (req, res) => {
+  const { immatriculation, service, chauffeur_matricule, chauffeur_nom,
+    ripeur1_matricule, ripeur1_nom, ripeur2_matricule, ripeur2_nom,
+    ripeur3_matricule, ripeur3_nom, circuit } = req.body
+  if (!immatriculation || !service) return res.status(400).json({ error: 'immatriculation et service requis' })
+  try {
+    db.prepare(`
+      INSERT INTO equipes_vehicule (immatriculation, service, chauffeur_matricule, chauffeur_nom,
+        ripeur1_matricule, ripeur1_nom, ripeur2_matricule, ripeur2_nom,
+        ripeur3_matricule, ripeur3_nom, circuit, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      ON CONFLICT(immatriculation, service) DO UPDATE SET
+        chauffeur_matricule = excluded.chauffeur_matricule,
+        chauffeur_nom = excluded.chauffeur_nom,
+        ripeur1_matricule = excluded.ripeur1_matricule,
+        ripeur1_nom = excluded.ripeur1_nom,
+        ripeur2_matricule = excluded.ripeur2_matricule,
+        ripeur2_nom = excluded.ripeur2_nom,
+        ripeur3_matricule = excluded.ripeur3_matricule,
+        ripeur3_nom = excluded.ripeur3_nom,
+        circuit = excluded.circuit,
+        updated_at = datetime('now')
+    `).run(immatriculation, service, chauffeur_matricule || '', chauffeur_nom || '',
+      ripeur1_matricule || '', ripeur1_nom || '',
+      ripeur2_matricule || '', ripeur2_nom || '',
+      ripeur3_matricule || '', ripeur3_nom || '',
+      circuit || '')
+    res.status(201).json({ success: true })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
 // ═══ STATS GLOBALES ═══
 
 router.get('/stats', (req, res) => {

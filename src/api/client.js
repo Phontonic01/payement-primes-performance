@@ -99,6 +99,18 @@ export const api = {
   },
   createTriSaisie: (data) => request('/saisies/tri', { method: 'POST', body: JSON.stringify(data) }),
 
+  // ═══ Historique équipages véhicule ═══
+  getHistoriqueVehicule: (immatriculation) =>
+    request(`/saisies/historique-vehicule/${encodeURIComponent(immatriculation)}`),
+
+  // ═══ Équipes véhicule ═══
+  getEquipeVehicule: (immatriculation, service) => {
+    const params = new URLSearchParams()
+    if (service) params.set('service', service)
+    return request(`/saisies/equipe/${encodeURIComponent(immatriculation)}?${params}`)
+  },
+  saveEquipeVehicule: (data) => request('/saisies/equipe', { method: 'POST', body: JSON.stringify(data) }),
+
   getSaisiesStats: (mois) => request(`/saisies/stats${mois ? '?mois=' + mois : ''}`),
   getAgregation: (matricule, mois) => request(`/saisies/agregation/${matricule}${mois ? '?mois=' + mois : ''}`),
 
