@@ -241,6 +241,51 @@ const SCHEMA = `
     UNIQUE(immatriculation, service)
   );
 
+  CREATE TABLE IF NOT EXISTS equipes_journalieres (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT NOT NULL,
+    no_parc TEXT NOT NULL,
+    poste TEXT NOT NULL CHECK(poste IN ('JOUR','NUIT')),
+    mois_exercice TEXT DEFAULT '',
+    type_logistique TEXT DEFAULT '',
+    affectation TEXT DEFAULT '',
+    chauffeur_matricule TEXT DEFAULT '',
+    chauffeur_nom TEXT DEFAULT '',
+    chauffeur_rh_ok INTEGER DEFAULT 0,
+    ripeurs_json TEXT DEFAULT '[]',
+    tonnage_excel REAL DEFAULT 0,
+    rotations_excel INTEGER DEFAULT 0,
+    presences_excel INTEGER DEFAULT 0,
+    absences_excel INTEGER DEFAULT 0,
+    source TEXT DEFAULT 'EXCEL',
+    fichier_source TEXT DEFAULT '',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(date, no_parc, poste)
+  );
+
+  CREATE TABLE IF NOT EXISTS equipes_journalieres_membres (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    equipe_id INTEGER NOT NULL,
+    date TEXT NOT NULL,
+    no_parc TEXT NOT NULL,
+    poste TEXT NOT NULL,
+    matricule TEXT NOT NULL,
+    nom TEXT DEFAULT '',
+    fonction TEXT DEFAULT '',
+    role TEXT NOT NULL CHECK(role IN ('CHAUFFEUR','RIPEUR','CONDUCTEUR','AUTRE')),
+    rh_ok INTEGER DEFAULT 0,
+    presence INTEGER DEFAULT 0,
+    absence INTEGER DEFAULT 0,
+    FOREIGN KEY(equipe_id) REFERENCES equipes_journalieres(id) ON DELETE CASCADE
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_equipes_j_date ON equipes_journalieres(date);
+  CREATE INDEX IF NOT EXISTS idx_equipes_j_parc ON equipes_journalieres(no_parc);
+  CREATE INDEX IF NOT EXISTS idx_equipes_j_chauffeur ON equipes_journalieres(chauffeur_matricule);
+  CREATE INDEX IF NOT EXISTS idx_equipes_jm_mat ON equipes_journalieres_membres(matricule);
+  CREATE INDEX IF NOT EXISTS idx_equipes_jm_date ON equipes_journalieres_membres(date);
+  CREATE INDEX IF NOT EXISTS idx_equipes_jm_mat_date ON equipes_journalieres_membres(matricule, date);
+
   CREATE INDEX IF NOT EXISTS idx_equipes_immat ON equipes_vehicule(immatriculation);
   CREATE INDEX IF NOT EXISTS idx_pb_mapping_matricule ON pont_bascule_mapping(matricule_rh);
   CREATE INDEX IF NOT EXISTS idx_agents_matricule ON agents(matricule);

@@ -9,6 +9,7 @@ import { usePrimesStore } from '@/stores/primes'
 import { usePontBasculeStore } from '@/stores/pontBascule'
 import { useSaisiesStore } from '@/stores/saisies'
 import AgentSearchInput from '@/components/ui/AgentSearchInput.vue'
+import api from '@/api/client'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import DateInput from '@/components/ui/DateInput.vue'
 
@@ -23,22 +24,86 @@ const selectedMatricule = ref('')
 const selectedDate = ref(new Date().toISOString().split('T')[0])
 const selectedAgent = ref(null)
 
-// Si on arrive via /agent/:matricule, charger l'agent automatiquement
-onMounted(async () => {
-  const mat = route.params.matricule
-  if (mat) {
-    await agentsStore.ensureLoaded()
-    const agent = agentsStore.agents.find(a => a.matricule === mat)
-    if (agent) {
-      selectedMatricule.value = mat
-      selectedAgent.value = agent
-    }
+// Si on arrive via /agent/:matricule, charger l'agent automatiquement.
+// Recherche dans la base RH d'abord, puis fallback sur l'historique Excel
+// (cas des agents présents dans l'Excel d'évaluation mais hors base RH).
+async function chargerAgentParMatricule(mat) {
+  if (!mat) return
+  await agentsStore.ensureLoaded()
+  const agent = agentsStore.agents.find(a => a.matricule === mat)
+  if (agent) {
+    selectedMatricule.value = mat
+    selectedAgent.value = agent
+    return
   }
+  // Fallback : on tente de récupérer l'agent depuis l'Excel RH
+  try {
+    const data = await api.getHistoriqueAgent(mat)
+    if (data?.equipagesRH?.length) {
+      const e0 = data.equipagesRH[0]
+      const role = e0.role === 'CHAUFFEUR' ? 'CHAUFFEUR' : 'EQUIPIER'
+      // Récupérer le nom : si l'agent est chauffeur, c'est e0.chauffeur.nom
+      // sinon c'est dans e0.ripeurs où is_self === true
+      let nom = ''
+      if (e0.chauffeur?.is_self) nom = e0.chauffeur.nom
+      else {
+        const self = (e0.ripeurs || []).find(r => r.is_self)
+        nom = self?.nom || e0.chauffeur?.nom || `Matricule ${mat}`
+      }
+      selectedMatricule.value = mat
+      selectedAgent.value = {
+        matricule: mat,
+        nom: nom.trim(),
+        role,
+        fonction: e0.role || '',
+        zone: 'Hors base RH',
+        service: 'COLLECTE',
+        _hors_rh: true,
+      }
+    }
+  } catch (e) {
+    console.warn('Fallback agent Excel échoué :', e.message)
+  }
+}
+
+onMounted(async () => {
+  await chargerAgentParMatricule(route.params.matricule)
+})
+
+// Re-charger si on change de route /agent/:matricule sans démonter la vue
+watch(() => route.params.matricule, (m) => {
+  if (m) chargerAgentParMatricule(m)
 })
 
 function onAgentSelected(agent) {
   selectedAgent.value = agent
 }
+
+// ─── Historique RH (équipages Excel) ───
+const equipagesRH = ref([])
+const bilanRH = ref([])
+const anomaliesPrime = ref([])
+const historiqueRHLoading = ref(false)
+const historiqueRHOuvert = ref(false)
+
+async function chargerHistoriqueRH(matricule) {
+  if (!matricule) return
+  historiqueRHLoading.value = true
+  equipagesRH.value = []
+  bilanRH.value = []
+  anomaliesPrime.value = []
+  try {
+    const data = await api.getHistoriqueAgent(matricule)
+    equipagesRH.value = data.equipagesRH || []
+    bilanRH.value = data.bilanRH || []
+    anomaliesPrime.value = data.anomaliesPrime || []
+  } catch { /* pas bloquant */ }
+  historiqueRHLoading.value = false
+}
+
+watch(selectedAgent, (a) => {
+  if (a?.matricule) chargerHistoriqueRH(a.matricule)
+}, { immediate: true })
 
 // Mois sélectionné
 const moisSelectionne = computed(() => {
@@ -637,10 +702,150 @@ function scoreBarColor(score) {
           </table>
         </div>
       </div>
+
     </template>
 
-    <!-- Agent sélectionné, aucune donnée nulle part -->
-    <div v-else-if="selectedAgent && !fiche" class="bg-white rounded-xl border border-gray-100 p-12 text-center">
+    <!-- ─── Tournées RH (source Excel d'évaluation) — affiché DÈS qu'on a un agent ─── -->
+    <div v-if="selectedAgent && (equipagesRH.length > 0 || anomaliesPrime.length > 0)"
+      class="bg-white rounded-xl border border-amber-200 overflow-hidden mt-4">
+      <div class="p-4 border-b border-amber-100 bg-amber-50/40 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
+            <Truck class="w-5 h-5 text-amber-700" />
+          </div>
+          <div>
+            <h3 class="text-base font-semibold text-gray-900">Tournées RH (source Excel d'évaluation)</h3>
+            <p class="text-xs text-gray-500">
+              {{ equipagesRH.length }} tournées trouvées
+              <span v-if="anomaliesPrime.length > 0" class="ml-2 px-2 py-0.5 bg-red-100 text-red-700 rounded font-bold">
+                ⚠ {{ anomaliesPrime.length }} jour(s) avec saisie sans présence Excel
+              </span>
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bilan mensuel Excel -->
+      <div v-if="bilanRH.length > 0" class="p-4 border-b border-amber-100 grid grid-cols-2 md:grid-cols-3 gap-3">
+        <div v-for="b in bilanRH" :key="b.mois" class="p-3 rounded-xl bg-amber-50 border border-amber-100">
+          <p class="text-[10px] font-semibold text-amber-700 uppercase tracking-wider">{{ b.mois }}</p>
+          <p class="text-lg font-bold text-gray-900 mt-1">{{ b.tournees }} tournées</p>
+          <p class="text-[11px] text-gray-600">
+            {{ b.jours_travailles }} jours · {{ b.presences || 0 }} présences · {{ b.absences || 0 }} absences
+          </p>
+          <p class="text-[11px] text-gray-600">
+            {{ (b.tonnage_cumule || 0).toFixed(2) }} t · {{ b.rotations_cumul || 0 }} rotations
+          </p>
+        </div>
+      </div>
+
+      <!-- Anomalies prime -->
+      <div v-if="anomaliesPrime.length > 0" class="p-4 border-b border-amber-100 bg-red-50/40">
+        <p class="text-sm font-semibold text-red-800 mb-2 flex items-center gap-2">
+          <AlertTriangle class="w-4 h-4" /> Saisies sans présence dans l'équipage RH
+        </p>
+        <p class="text-xs text-gray-600 mb-3">
+          L'agent a été déclaré sur une tournée alors qu'il n'apparaît pas dans l'Excel RH du jour — à vérifier avant paiement.
+        </p>
+        <div class="overflow-x-auto bg-white rounded-lg border border-red-100">
+          <table class="w-full text-xs">
+            <thead>
+              <tr class="bg-red-50 border-b border-red-100">
+                <th class="text-left px-3 py-2 font-semibold text-red-800">Date</th>
+                <th class="text-left px-3 py-2 font-semibold text-red-800">N° Parc</th>
+                <th class="text-left px-3 py-2 font-semibold text-red-800">Immatriculation</th>
+                <th class="text-right px-3 py-2 font-semibold text-red-800">Tonnage saisi</th>
+                <th class="text-right px-3 py-2 font-semibold text-red-800">Rotations</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-red-50">
+              <tr v-for="(a, i) in anomaliesPrime" :key="i">
+                <td class="px-3 py-2 font-mono text-gray-700">{{ a.date.split('-').reverse().join('/') }}</td>
+                <td class="px-3 py-2">{{ a.no_parc || '-' }}</td>
+                <td class="px-3 py-2 font-mono text-gray-600">{{ a.immatriculation || '-' }}</td>
+                <td class="px-3 py-2 text-right font-mono">{{ a.tonnage }} t</td>
+                <td class="px-3 py-2 text-right font-mono">{{ a.rotations }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Tableau des tournées -->
+      <div class="overflow-x-auto">
+        <table class="w-full text-xs">
+          <thead>
+            <tr class="bg-gray-50 border-b border-gray-100">
+              <th class="text-left px-3 py-2 font-semibold text-gray-500">Date</th>
+              <th class="text-center px-3 py-2 font-semibold text-gray-500">Poste</th>
+              <th class="text-center px-3 py-2 font-semibold text-gray-500">Rôle</th>
+              <th class="text-left px-3 py-2 font-semibold text-gray-500">Véh / Affect.</th>
+              <th class="text-left px-3 py-2 font-semibold text-gray-500 min-w-[280px]">Équipage du jour</th>
+              <th class="text-center px-3 py-2 font-semibold text-gray-500">P/A</th>
+              <th class="text-right px-3 py-2 font-semibold text-gray-500">Tonnage</th>
+              <th class="text-right px-3 py-2 font-semibold text-gray-500">Rot.</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-50">
+            <tr v-for="(e, i) in equipagesRH" :key="i" class="hover:bg-amber-50/30 align-top">
+              <td class="px-3 py-2 font-mono text-gray-700 whitespace-nowrap">{{ e.date.split('-').reverse().join('/') }}</td>
+              <td class="px-3 py-2 text-center">
+                <span class="px-1.5 py-0.5 rounded text-[10px] font-bold"
+                  :class="e.poste === 'JOUR' ? 'bg-yellow-100 text-yellow-700' : 'bg-indigo-100 text-indigo-700'">
+                  {{ e.poste }}
+                </span>
+              </td>
+              <td class="px-3 py-2 text-center">
+                <span class="px-1.5 py-0.5 rounded text-[10px] font-bold"
+                  :class="e.role === 'CHAUFFEUR' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'">
+                  {{ e.role }}
+                </span>
+              </td>
+              <td class="px-3 py-2 whitespace-nowrap">
+                <div class="font-mono font-semibold text-gray-900">N°{{ e.no_parc }}</div>
+                <div class="text-[10px] text-gray-500">{{ e.affectation || '-' }}</div>
+              </td>
+              <td class="px-3 py-2">
+                <div class="space-y-1">
+                  <!-- Chauffeur -->
+                  <div class="flex items-center gap-1.5">
+                    <span class="px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 text-[9px] font-bold">CH</span>
+                    <span :class="['text-xs', e.chauffeur.is_self ? 'font-bold text-amber-800' : 'text-gray-800']">
+                      {{ e.chauffeur.nom || '—' }}
+                    </span>
+                    <span class="font-mono text-[10px] text-gray-400">{{ e.chauffeur.matricule }}</span>
+                    <span v-if="e.chauffeur.is_self" class="text-[9px] text-amber-700 font-semibold">(lui-même)</span>
+                    <span v-if="!e.chauffeur.rh_ok && e.chauffeur.matricule"
+                      class="px-1 py-0.5 rounded bg-red-100 text-red-700 text-[9px] font-bold" title="Hors RH">⚠</span>
+                  </div>
+                  <!-- Ripeurs -->
+                  <div v-for="(r, j) in e.ripeurs" :key="j" class="flex items-center gap-1.5">
+                    <span class="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[9px] font-bold">R{{ j + 1 }}</span>
+                    <span :class="['text-xs', r.is_self ? 'font-bold text-amber-800' : 'text-gray-700']">
+                      {{ r.nom || '—' }}
+                    </span>
+                    <span class="font-mono text-[10px] text-gray-400">{{ r.matricule }}</span>
+                    <span v-if="r.is_self" class="text-[9px] text-amber-700 font-semibold">(lui-même)</span>
+                    <span v-if="!r.rh_ok"
+                      class="px-1 py-0.5 rounded bg-red-100 text-red-700 text-[9px] font-bold" title="Hors RH">⚠</span>
+                  </div>
+                </div>
+              </td>
+              <td class="px-3 py-2 text-center">
+                <span :class="e.presence ? 'text-green-700 font-bold' : 'text-red-600 font-bold'">
+                  {{ e.presence ? 'P' : 'A' }}
+                </span>
+              </td>
+              <td class="px-3 py-2 text-right font-mono whitespace-nowrap">{{ (e.tonnage_excel || 0).toFixed(2) }} t</td>
+              <td class="px-3 py-2 text-right font-mono">{{ e.rotations_excel }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Agent sélectionné, aucune donnée pont-bascule -->
+    <div v-if="selectedAgent && !fiche && equipagesRH.length === 0 && anomaliesPrime.length === 0" class="bg-white rounded-xl border border-gray-100 p-12 text-center">
       <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-amber-50 mb-4">
         <AlertTriangle class="w-8 h-8 text-amber-400" />
       </div>

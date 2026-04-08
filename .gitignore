@@ -26,6 +26,7 @@ dist-ssr
 # Claude Code
 .claude/
 .serena/
+.remember/
 screenshots/
 .playwright-mcp/
 
@@ -37,6 +38,8 @@ screenshots/
 data/*.db
 data/*.db-wal
 data/*.db-shm
+data/backups/
+# data/imports/ est conservé dans git (sources Excel RH historisées)
 
 # Large binary files
 *.pdf

@@ -3,7 +3,7 @@ import {
   Truck, MapPin, Wrench, ShieldCheck, LogOut, Landmark, Factory,
   LayoutDashboard, ClipboardList, Route, History,
   CheckCircle, Wine, Recycle, Users, SlidersHorizontal,
-  FileCheck, FileSpreadsheet, ChevronDown, Menu, X,
+  FileCheck, FileSpreadsheet, ChevronDown, Menu, X, AlertTriangle,
   Search, ChevronRight, Sun, Moon, Bell
 } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
@@ -156,6 +156,7 @@ const navGroups = computed(() => [
       { name: 'Consolidation', to: '/daf/consolidation', icon: FileCheck },
       { name: 'Validation Prime', to: '/daf/validation', icon: CheckCircle },
       { name: 'Rapports & Export', to: '/daf/rapports', icon: FileSpreadsheet },
+      { name: 'Anomalies Primes', to: '/daf/anomalies-primes', icon: AlertTriangle },
     ]
   }
 ].filter(g => g.items?.some(i => i.show !== false) && (g.show === undefined || g.show)))

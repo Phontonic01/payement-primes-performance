@@ -181,6 +181,8 @@ router.post('/tri', (req, res) => {
 
 router.get('/historique-vehicule/:immatriculation', (req, res) => {
   const immat = req.params.immatriculation
+  const { noParc } = req.query  // optionnel pour relier aux équipages Excel
+
   // Fiches collecte
   const fiches = db.prepare(`
     SELECT date, chauffeur_matricule, chauffeur_nom, ripeur1_matricule, ripeur1_nom,
@@ -218,7 +220,54 @@ router.get('/historique-vehicule/:immatriculation', (req, res) => {
     LIMIT 12
   `).all(immat)
 
-  res.json({ saisies, bilan: bilanRows })
+  // ─── Équipages historiques RH (import Excel) ───
+  // Reliés via le n° de parc passé en query (pas via immat car l'Excel n'a pas l'immat)
+  let equipagesRH = []
+  let bilanRH = []
+  if (noParc) {
+    const eqRows = db.prepare(`
+      SELECT date, no_parc, poste, mois_exercice, type_logistique, affectation,
+             chauffeur_matricule, chauffeur_nom, chauffeur_rh_ok,
+             ripeurs_json, tonnage_excel, rotations_excel,
+             presences_excel, absences_excel
+      FROM equipes_journalieres
+      WHERE no_parc = ?
+      ORDER BY date DESC, poste
+      LIMIT 60
+    `).all(String(noParc))
+
+    equipagesRH = eqRows.map(r => ({
+      date: r.date,
+      no_parc: r.no_parc,
+      poste: r.poste,
+      mois_exercice: r.mois_exercice,
+      type_logistique: r.type_logistique,
+      affectation: r.affectation,
+      chauffeur: { matricule: r.chauffeur_matricule, nom: r.chauffeur_nom, rh_ok: !!r.chauffeur_rh_ok },
+      ripeurs: (() => { try { return JSON.parse(r.ripeurs_json || '[]') } catch { return [] } })(),
+      tonnage_excel: r.tonnage_excel,
+      rotations_excel: r.rotations_excel,
+      presences_excel: r.presences_excel,
+      absences_excel: r.absences_excel,
+    }))
+
+    // Bilan mensuel RH (Excel) : agrégé par mois
+    bilanRH = db.prepare(`
+      SELECT substr(date, 1, 7) as mois,
+             COUNT(*) as tournees,
+             COUNT(DISTINCT date) as jours_travailles,
+             SUM(tonnage_excel) as tonnage_cumule,
+             SUM(rotations_excel) as rotations_cumul,
+             ROUND(AVG(tonnage_excel), 2) as tonnage_moyen
+      FROM equipes_journalieres
+      WHERE no_parc = ?
+      GROUP BY substr(date, 1, 7)
+      ORDER BY mois DESC
+      LIMIT 6
+    `).all(String(noParc))
+  }
+
+  res.json({ saisies, bilan: bilanRows, equipagesRH, bilanRH })
 })
 
 // ═══ HISTORIQUE AGENT (chauffeur ou ripeur) ═══
@@ -272,7 +321,88 @@ router.get('/historique-agent/:matricule', (req, res) => {
     ORDER BY mois DESC LIMIT 6
   `).all(mat)
 
-  res.json({ saisies, bilan })
+  // ─── Présence dans les équipages RH (Excel) ───
+  // Pour chaque tournée de l'agent, on retourne aussi tous les autres membres
+  // de l'équipe (chauffeur + ripeurs) pour pouvoir les afficher.
+  const equipagesRHRaw = db.prepare(`
+    SELECT m.role, m.fonction, m.presence, m.absence, m.rh_ok, m.equipe_id,
+           e.date, e.no_parc, e.poste, e.affectation, e.type_logistique,
+           e.chauffeur_matricule, e.chauffeur_nom, e.chauffeur_rh_ok,
+           e.tonnage_excel, e.rotations_excel, e.ripeurs_json
+    FROM equipes_journalieres_membres m
+    JOIN equipes_journalieres e ON e.id = m.equipe_id
+    WHERE m.matricule = ?
+    ORDER BY e.date DESC, e.poste
+    LIMIT 60
+  `).all(mat)
+
+  const equipagesRH = equipagesRHRaw.map(r => {
+    let ripeurs = []
+    try { ripeurs = JSON.parse(r.ripeurs_json || '[]') } catch {}
+    return {
+      role: r.role,
+      fonction: r.fonction,
+      presence: r.presence,
+      absence: r.absence,
+      rh_ok: !!r.rh_ok,
+      date: r.date,
+      no_parc: r.no_parc,
+      poste: r.poste,
+      affectation: r.affectation,
+      type_logistique: r.type_logistique,
+      tonnage_excel: r.tonnage_excel,
+      rotations_excel: r.rotations_excel,
+      chauffeur: {
+        matricule: r.chauffeur_matricule,
+        nom: r.chauffeur_nom,
+        rh_ok: !!r.chauffeur_rh_ok,
+        is_self: r.chauffeur_matricule === mat,
+      },
+      // Ripeurs : tous, en marquant lequel est l'agent consulté
+      ripeurs: ripeurs.map(rp => ({
+        matricule: rp.matricule,
+        nom: rp.nom,
+        rh_ok: !!rp.rh_ok,
+        presence: rp.presence,
+        is_self: rp.matricule === mat,
+      })),
+      // Co-équipiers (sans l'agent lui-même) — utile pour ripeurs qui veulent voir leurs collègues
+      coequipiers: ripeurs.filter(rp => rp.matricule !== mat),
+    }
+  })
+
+  // Bilan mensuel RH (basé sur Excel)
+  const bilanRH = db.prepare(`
+    SELECT substr(e.date, 1, 7) as mois,
+           COUNT(DISTINCT e.date) as jours_travailles,
+           COUNT(*) as tournees,
+           SUM(e.tonnage_excel) as tonnage_cumule,
+           SUM(e.rotations_excel) as rotations_cumul,
+           SUM(m.presence) as presences,
+           SUM(m.absence) as absences,
+           ROUND(AVG(e.tonnage_excel), 2) as tonnage_moyen
+    FROM equipes_journalieres_membres m
+    JOIN equipes_journalieres e ON e.id = m.equipe_id
+    WHERE m.matricule = ?
+    GROUP BY substr(e.date, 1, 7)
+    ORDER BY mois DESC LIMIT 6
+  `).all(mat)
+
+  // Détection anomalies prime : jours où l'agent a une saisie/tonnage
+  // mais n'apparaît PAS dans l'équipage RH du jour (potentiel paiement indu).
+  const anomaliesPrime = db.prepare(`
+    SELECT t.date, t.no_parc, t.immatriculation, t.tonnage, t.rotations
+    FROM tonnages t
+    WHERE t.matricule = ?
+      AND NOT EXISTS (
+        SELECT 1 FROM equipes_journalieres_membres m
+        JOIN equipes_journalieres e ON e.id = m.equipe_id
+        WHERE m.matricule = t.matricule AND e.date = t.date
+      )
+    ORDER BY t.date DESC LIMIT 30
+  `).all(mat)
+
+  res.json({ saisies, bilan, equipagesRH, bilanRH, anomaliesPrime })
 })
 
 // ═══ ÉQUIPES VÉHICULE (mémoire dernière composition) ═══

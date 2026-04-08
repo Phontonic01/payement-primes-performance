@@ -100,8 +100,10 @@ export const api = {
   createTriSaisie: (data) => request('/saisies/tri', { method: 'POST', body: JSON.stringify(data) }),
 
   // ═══ Historique équipages ═══
-  getHistoriqueVehicule: (immatriculation) =>
-    request(`/saisies/historique-vehicule/${encodeURIComponent(immatriculation)}`),
+  getHistoriqueVehicule: (immatriculation, noParc) => {
+    const qs = noParc ? `?noParc=${encodeURIComponent(noParc)}` : ''
+    return request(`/saisies/historique-vehicule/${encodeURIComponent(immatriculation)}${qs}`)
+  },
   getHistoriqueAgent: (matricule) =>
     request(`/saisies/historique-agent/${encodeURIComponent(matricule)}`),
 
@@ -112,6 +114,36 @@ export const api = {
     return request(`/saisies/equipe/${encodeURIComponent(immatriculation)}?${params}`)
   },
   saveEquipeVehicule: (data) => request('/saisies/equipe', { method: 'POST', body: JSON.stringify(data) }),
+
+  // ═══ Équipes journalières (import Excel RH) ═══
+  getEquipesJournalieres: (params = {}) => {
+    const qs = new URLSearchParams(params).toString()
+    return request(`/equipes-journalieres${qs ? '?' + qs : ''}`)
+  },
+  getEquipeJourneeVehicule: (noParc, dateDebut, dateFin) => {
+    const params = new URLSearchParams()
+    if (dateDebut) params.set('dateDebut', dateDebut)
+    if (dateFin) params.set('dateFin', dateFin)
+    return request(`/equipes-journalieres/vehicule/${encodeURIComponent(noParc)}?${params}`)
+  },
+  getEquipeJourneeAgent: (matricule, dateDebut, dateFin) => {
+    const params = new URLSearchParams()
+    if (dateDebut) params.set('dateDebut', dateDebut)
+    if (dateFin) params.set('dateFin', dateFin)
+    return request(`/equipes-journalieres/agent/${encodeURIComponent(matricule)}?${params}`)
+  },
+  getEquipesAnomalies: (dateDebut, dateFin) => {
+    const params = new URLSearchParams()
+    if (dateDebut) params.set('dateDebut', dateDebut)
+    if (dateFin) params.set('dateFin', dateFin)
+    return request(`/equipes-journalieres/anomalies?${params}`)
+  },
+  getEquipesStats: () => request('/equipes-journalieres/stats'),
+  getChauffeursSuspects: ({ seuilVehicules = 5, seuilJours = 6, dateRef } = {}) => {
+    const params = new URLSearchParams({ seuilVehicules, seuilJours })
+    if (dateRef) params.set('dateRef', dateRef)
+    return request(`/equipes-journalieres/chauffeurs-suspects?${params}`)
+  },
 
   getSaisiesStats: (mois) => request(`/saisies/stats${mois ? '?mois=' + mois : ''}`),
   getAgregation: (matricule, mois) => request(`/saisies/agregation/${matricule}${mois ? '?mois=' + mois : ''}`),

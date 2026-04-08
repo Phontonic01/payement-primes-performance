@@ -189,6 +189,12 @@ const router = createRouter({
       name: 'daf-rapports',
       component: () => import('@/views/daf/DafRapportsView.vue'),
       meta: { requiresAuth: true, layout: 'DashboardLayout', title: 'Rapports & Export', breadcrumb: ['DAF', 'Rapports & Export'] }
+    },
+    {
+      path: '/daf/anomalies-primes',
+      name: 'daf-anomalies-primes',
+      component: () => import('@/views/daf/DafAnomaliesPrimesView.vue'),
+      meta: { requiresAuth: true, layout: 'DashboardLayout', title: 'Anomalies Primes', breadcrumb: ['DAF', 'Anomalies Primes'] }
     }
   ]
 })

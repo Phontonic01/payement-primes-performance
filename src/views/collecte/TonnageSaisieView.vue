@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import DateInput from '@/components/ui/DateInput.vue'
@@ -81,7 +81,21 @@ async function chargerVehiculesDuJour() {
   }
 }
 
-watch(date, () => chargerVehiculesDuJour(), { immediate: true })
+// Recharge à chaque changement de date (mais pas au mount — onMounted s'en charge ci-dessous
+// pour garantir que les stores asynchrones soient prêts).
+watch(date, () => chargerVehiculesDuJour())
+
+// Auto-chargement à l'arrivée sur la page : on attend que les stores soient prêts
+// puis on déclenche le chargement des véhicules pont-bascule.
+onMounted(async () => {
+  try {
+    await Promise.all([
+      agentsStore.ensureLoaded?.(),
+      primesStore.chargerConfig?.(),
+    ])
+  } catch { /* on continue même si un store échoue */ }
+  await chargerVehiculesDuJour()
+})
 
 // ── Paramètres ──
 const plafond = computed(() => primesStore.config.plafonds.CHAUFFEUR_COLLECTE)
@@ -141,8 +155,11 @@ const equipeAcceptee = ref(false)
 // ── Historique équipages ──
 const historiqueVehicule = ref([])
 const historiqueBilan = ref([])
+const equipagesRH = ref([])         // équipages quotidiens importés depuis Excel RH
+const bilanRH = ref([])             // bilan mensuel basé sur l'Excel
 const historiqueLoading = ref(false)
 const historiqueOuvert = ref(false)
+const equipagesRHOuvert = ref(false)
 
 // ── Historique agent (ripeur) ──
 const historiqueAgent = ref(null) // { matricule, nom, saisies, bilan }
@@ -167,15 +184,19 @@ async function voirHistoriqueAgent(agent) {
   historiqueAgentLoading.value = false
 }
 
-async function chargerHistorique(immat) {
+async function chargerHistorique(immat, noParc) {
   historiqueLoading.value = true
   historiqueVehicule.value = []
   historiqueBilan.value = []
+  equipagesRH.value = []
+  bilanRH.value = []
   historiqueAgent.value = null
   try {
-    const data = await api.getHistoriqueVehicule(immat)
+    const data = await api.getHistoriqueVehicule(immat, noParc)
     historiqueVehicule.value = data.saisies || []
     historiqueBilan.value = data.bilan || []
+    equipagesRH.value = data.equipagesRH || []
+    bilanRH.value = data.bilanRH || []
   } catch { /* pas bloquant */ }
   historiqueLoading.value = false
 }
@@ -187,6 +208,88 @@ const selectedRipeur1 = ref(null)
 const selectedRipeur2 = ref(null)
 const selectedRipeur3 = ref(null)
 const circuitSaisi = ref('')
+
+// ── Détection chauffeur suspect (Excel non fiable) ──
+const chauffeurSuspect = ref(null)  // { matricule, nom, vehicules_distincts, jours_distincts, ... }
+
+// ── Verrouillage historique RH (date > 7 jours) ──
+const SEUIL_VERROUILLAGE_JOURS = 7
+
+const isDateHistorique = computed(() => {
+  if (!date.value) return false
+  const sel = new Date(date.value + 'T00:00:00')
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const diffJours = Math.floor((today - sel) / (24 * 60 * 60 * 1000))
+  return diffJours > SEUIL_VERROUILLAGE_JOURS
+})
+
+const equipageVerrouille = ref(null)  // équipage Excel pour la date+véhicule exacts (mode lecture seule)
+const verrouillageLoading = ref(false)
+const verrouillageMessage = ref('')
+
+// Verrou actif = on a un équipage figé issu de l'Excel pour cette date précise
+const ripeursVerrouilles = computed(() => isDateHistorique.value && !!equipageVerrouille.value)
+
+const lockReason = computed(() => {
+  if (!ripeursVerrouilles.value) return ''
+  const d = equipageVerrouille.value?.date?.split('-').reverse().join('/') || ''
+  return `Équipage figé d'après l'Excel RH du ${d}`
+})
+
+async function chargerEquipageVerrouille() {
+  equipageVerrouille.value = null
+  verrouillageMessage.value = ''
+  // Convention pont-bascule : v.immatriculation = n° de parc
+  const noParc = String(selectedVehicule.value?.immatriculation || '').trim()
+  if (!isDateHistorique.value || !noParc) return
+  // Si le chauffeur est suspect, on REFUSE de verrouiller sur l'Excel : seul le pont-bascule fait foi
+  if (chauffeurSuspect.value) {
+    verrouillageMessage.value = `Chauffeur ${chauffeurSuspect.value.nom} déclaré sur ${chauffeurSuspect.value.vehicules_distincts} véhicules en ${chauffeurSuspect.value.jours_distincts} jours dans l'Excel — données RH non fiables. Saisie manuelle obligatoire en s'appuyant sur le pont-bascule.`
+    return
+  }
+
+  verrouillageLoading.value = true
+  try {
+    const list = await api.getEquipesJournalieres({
+      date: date.value,
+      no_parc: noParc,
+    })
+    if (Array.isArray(list) && list.length > 0) {
+      // S'il y a JOUR + NUIT, prendre celui dont le chauffeur correspond, sinon le premier
+      const normalize = s => (s || '').toLowerCase().replace(/\s+/g, ' ').trim()
+      const cible = normalize(selectedVehicule.value.chauffeur)
+      const match = list.find(e => normalize(e.chauffeur?.nom) === cible) || list[0]
+      equipageVerrouille.value = match
+      // Auto-application : on remplit ET on bloque les champs
+      const ripeurs = match.ripeurs || []
+      const matEqu = (rp) => rp ? (agentsStore.getAgentByMatricule(rp.matricule) || { matricule: rp.matricule, nom: rp.nom, role: 'EQUIPIER', zone: '' }) : null
+      ripeur1Matricule.value = ripeurs[0]?.matricule || ''
+      selectedRipeur1.value = matEqu(ripeurs[0])
+      ripeur2Matricule.value = ripeurs[1]?.matricule || ''
+      selectedRipeur2.value = matEqu(ripeurs[1])
+      ripeur3Matricule.value = ripeurs[2]?.matricule || ''
+      selectedRipeur3.value = matEqu(ripeurs[2])
+      circuitSaisi.value = match.affectation || ''
+      equipeAcceptee.value = true
+    } else {
+      verrouillageMessage.value = `Aucun équipage RH pour le ${date.value.split('-').reverse().join('/')} sur le véhicule N°${selectedVehicule.value.noParc}. Saisie impossible — vérifie la date ou le véhicule.`
+    }
+  } catch (err) {
+    verrouillageMessage.value = `Erreur de chargement : ${err.message}`
+  }
+  verrouillageLoading.value = false
+}
+
+// Recharge à chaque changement de date OU de véhicule (immatriculation = n° de parc en PB)
+watch([date, () => selectedVehicule.value?.immatriculation], () => {
+  if (isDateHistorique.value && selectedVehicule.value) {
+    chargerEquipageVerrouille()
+  } else {
+    equipageVerrouille.value = null
+    verrouillageMessage.value = ''
+  }
+})
 
 async function selectionnerVehicule(v) {
   selectedVehicule.value = v
@@ -203,12 +306,61 @@ async function selectionnerVehicule(v) {
 
   // Charger historique + suggestion en parallèle
   historiqueOuvert.value = false
-  chargerHistorique(v.immatriculation)
+  equipagesRHOuvert.value = false
+  // ⚠ Convention pont-bascule : v.immatriculation EST le n° de parc (ex: "237", "125")
+  // Le store local utilise des plaques (ex: "JY-557-AA"), mais ici on travaille avec PB.
+  const noParcVehicule = String(v.immatriculation || '').trim()
+  chargerHistorique(noParcVehicule, noParcVehicule)
   equipeLoading.value = true
+  chauffeurSuspect.value = null
   try {
-    const eq = await api.getEquipeVehicule(v.immatriculation, 'COLLECTE')
-    if (eq && eq.ripeur1_matricule) equipeSuggestion.value = eq
-  } catch { /* pas d'équipe connue */ }
+    // 0) Détection chauffeur suspect : trop de véhicules en peu de jours → Excel non fiable
+    try {
+      const sus = await api.getChauffeursSuspects({ seuilVehicules: 5, seuilJours: 6, dateRef: date.value })
+      if (sus?.chauffeurs_suspects?.length) {
+        const normalize = s => (s || '').toLowerCase().replace(/\s+/g, ' ').trim()
+        const cible = normalize(v.chauffeur)
+        const match = sus.chauffeurs_suspects.find(c => normalize(c.nom) === cible)
+        if (match) chauffeurSuspect.value = match
+      }
+    } catch { /* non bloquant */ }
+
+    // 1) Priorité : équipage RH le plus récent depuis l'Excel (par n° de parc)
+    //    Si possible, on cible la tournée où le chauffeur correspond au nom pont-bascule.
+    //    SAUF si le chauffeur est marqué comme suspect → on n'utilise PAS l'Excel.
+    if (noParcVehicule && !chauffeurSuspect.value) {
+      const equipages = await api.getEquipeJourneeVehicule(noParcVehicule)
+      if (Array.isArray(equipages) && equipages.length > 0) {
+        const normalize = s => (s || '').toLowerCase().replace(/\s+/g, ' ').trim()
+        const cibleNom = normalize(v.chauffeur)
+        // Tournée prioritaire : même chauffeur, sinon la plus récente
+        const matchChauffeur = equipages.find(e => normalize(e.chauffeur?.nom) === cibleNom)
+        const eq = matchChauffeur || equipages[0]
+        const ripeurs = eq.ripeurs || []
+        equipeSuggestion.value = {
+          source: 'EXCEL_RH',
+          date_source: eq.date,
+          poste: eq.poste,
+          ripeur1_matricule: ripeurs[0]?.matricule || '',
+          ripeur1_nom: ripeurs[0]?.nom || '',
+          ripeur2_matricule: ripeurs[1]?.matricule || '',
+          ripeur2_nom: ripeurs[1]?.nom || '',
+          ripeur3_matricule: ripeurs[2]?.matricule || '',
+          ripeur3_nom: ripeurs[2]?.nom || '',
+          circuit: eq.affectation || '',
+          chauffeur_match: !!matchChauffeur,
+          chauffeur_nom_excel: eq.chauffeur?.nom || '',
+        }
+      }
+    }
+    // 2) Fallback : table equipes_vehicule (suggestion statique des saisies app)
+    if (!equipeSuggestion.value) {
+      const eq = await api.getEquipeVehicule(v.immatriculation, 'COLLECTE')
+      if (eq && eq.ripeur1_matricule) equipeSuggestion.value = { ...eq, source: 'APP' }
+    }
+  } catch (err) {
+    console.warn('Suggestion équipe échouée :', err.message)
+  }
   equipeLoading.value = false
 
   // Scroll vers le formulaire
@@ -623,36 +775,154 @@ function submit() {
             </div>
           </div>
 
+          <!-- ─── Équipages RH (import Excel) ─── -->
+          <div v-if="equipagesRH.length > 0" class="rounded-2xl bg-white border border-amber-200 overflow-hidden">
+            <button type="button" @click="equipagesRHOuvert = !equipagesRHOuvert"
+              class="w-full flex items-center justify-between p-4 hover:bg-amber-50/50 transition-colors cursor-pointer">
+              <div class="flex items-center gap-3">
+                <div class="w-9 h-9 bg-amber-100 rounded-xl flex items-center justify-center">
+                  <Users class="w-5 h-5 text-amber-700" />
+                </div>
+                <div class="text-left">
+                  <span class="text-sm font-semibold text-gray-900">Équipages RH (Excel d'évaluation)</span>
+                  <p class="text-xs text-gray-500">{{ equipagesRH.length }} tournées historiques · source officielle RH</p>
+                </div>
+              </div>
+              <ChevronRight class="w-4 h-4 text-gray-400 transition-transform" :class="{ 'rotate-90': equipagesRHOuvert }" />
+            </button>
+            <div v-if="equipagesRHOuvert" class="border-t border-amber-100">
+              <!-- Bilan mensuel Excel -->
+              <div v-if="bilanRH.length > 0" class="p-4 border-b border-amber-100 grid grid-cols-2 md:grid-cols-3 gap-3">
+                <div v-for="b in bilanRH" :key="b.mois"
+                  class="p-3 rounded-xl bg-amber-50 border border-amber-100">
+                  <p class="text-[10px] font-semibold text-amber-700 uppercase tracking-wider">{{ b.mois }}</p>
+                  <p class="text-lg font-bold text-gray-900 mt-1">{{ b.tonnage_cumule?.toFixed?.(2) || 0 }} t</p>
+                  <p class="text-[11px] text-gray-600">{{ b.jours_travailles }} jours · {{ b.rotations_cumul }} rot. · moy {{ b.tonnage_moyen }} t</p>
+                </div>
+              </div>
+              <!-- Tableau des équipages -->
+              <div class="overflow-x-auto">
+                <table class="w-full text-xs">
+                  <thead>
+                    <tr class="bg-amber-50/50 border-b border-amber-100">
+                      <th class="text-left px-3 py-2 font-semibold text-amber-800">Date</th>
+                      <th class="text-center px-3 py-2 font-semibold text-amber-800">Poste</th>
+                      <th class="text-left px-3 py-2 font-semibold text-amber-800">Affectation</th>
+                      <th class="text-left px-3 py-2 font-semibold text-amber-800">Chauffeur</th>
+                      <th class="text-left px-3 py-2 font-semibold text-amber-800">Ripeurs</th>
+                      <th class="text-right px-3 py-2 font-semibold text-amber-800">Tonnage</th>
+                      <th class="text-right px-3 py-2 font-semibold text-amber-800">Rot.</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-amber-50">
+                    <tr v-for="(e, i) in equipagesRH" :key="i" class="hover:bg-amber-50/30">
+                      <td class="px-3 py-2 font-mono text-gray-700">{{ e.date.split('-').reverse().join('/') }}</td>
+                      <td class="px-3 py-2 text-center">
+                        <span class="px-1.5 py-0.5 rounded text-[10px] font-bold"
+                          :class="e.poste === 'JOUR' ? 'bg-yellow-100 text-yellow-700' : 'bg-indigo-100 text-indigo-700'">
+                          {{ e.poste }}
+                        </span>
+                      </td>
+                      <td class="px-3 py-2 text-gray-600">{{ e.affectation || '-' }}</td>
+                      <td class="px-3 py-2">
+                        <div class="flex items-center gap-1.5">
+                          <span class="text-gray-900">{{ e.chauffeur.nom || '-' }}</span>
+                          <span class="font-mono text-[10px] text-gray-400">{{ e.chauffeur.matricule }}</span>
+                          <span v-if="!e.chauffeur.rh_ok && e.chauffeur.matricule"
+                            class="px-1 py-0.5 rounded bg-red-100 text-red-700 text-[9px] font-bold" title="Matricule absent de la base RH">
+                            ⚠ HORS RH
+                          </span>
+                        </div>
+                      </td>
+                      <td class="px-3 py-2">
+                        <div class="flex flex-wrap gap-1">
+                          <span v-for="(r, j) in e.ripeurs" :key="j"
+                            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-gray-100 text-gray-700 text-[10px]">
+                            {{ r.nom || r.matricule }}
+                            <span v-if="!r.rh_ok" class="text-red-600 font-bold" title="Hors RH">⚠</span>
+                          </span>
+                        </div>
+                      </td>
+                      <td class="px-3 py-2 text-right font-mono font-semibold text-gray-900">{{ e.tonnage_excel?.toFixed?.(2) || 0 }} t</td>
+                      <td class="px-3 py-2 text-right font-mono text-gray-700">{{ e.rotations_excel }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
           <!-- Suggestion équipe (non pré-remplie) -->
           <div v-if="equipeLoading" class="flex items-center gap-3 p-4 bg-blue-50 rounded-xl border border-blue-100">
             <Loader2 class="w-5 h-5 text-blue-500 animate-spin" />
             <span class="text-sm text-blue-700">Recherche de la dernière équipe connue...</span>
           </div>
 
-          <div v-if="equipeSuggestion && !equipeAcceptee" class="rounded-xl bg-blue-50 border border-blue-200 p-4 space-y-3">
-            <div class="flex items-center gap-2">
-              <Users class="w-4 h-4 text-blue-600" />
-              <span class="text-sm font-semibold text-blue-800">Dernière équipe connue pour ce véhicule</span>
+          <div v-if="equipeSuggestion && !equipeAcceptee"
+            class="rounded-xl border p-4 space-y-3"
+            :class="equipeSuggestion.source === 'EXCEL_RH'
+              ? 'bg-amber-50 border-amber-200'
+              : 'bg-blue-50 border-blue-200'">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-2">
+                <Users class="w-4 h-4" :class="equipeSuggestion.source === 'EXCEL_RH' ? 'text-amber-700' : 'text-blue-600'" />
+                <span class="text-sm font-semibold" :class="equipeSuggestion.source === 'EXCEL_RH' ? 'text-amber-800' : 'text-blue-800'">
+                  <template v-if="equipeSuggestion.source === 'EXCEL_RH'">
+                    Équipage RH (Excel d'évaluation)
+                    <span v-if="equipeSuggestion.date_source" class="font-normal text-amber-700">
+                      — {{ equipeSuggestion.date_source.split('-').reverse().join('/') }}
+                      <span v-if="equipeSuggestion.poste" class="px-1 py-0 rounded bg-amber-200 text-[9px] font-bold ml-1">{{ equipeSuggestion.poste }}</span>
+                    </span>
+                  </template>
+                  <template v-else>Dernière équipe connue (saisies app)</template>
+                </span>
+              </div>
+              <span v-if="equipeSuggestion.source === 'EXCEL_RH' && !equipeSuggestion.chauffeur_match"
+                class="px-2 py-0.5 bg-red-100 text-red-700 text-[10px] font-bold rounded"
+                :title="`L'Excel RH avait un autre chauffeur : ${equipeSuggestion.chauffeur_nom_excel}`">
+                ⚠ chauffeur différent
+              </span>
+            </div>
+            <div v-if="equipeSuggestion.source === 'EXCEL_RH' && equipeSuggestion.chauffeur_nom_excel && !equipeSuggestion.chauffeur_match"
+              class="text-[11px] text-red-700 bg-red-50 border border-red-100 rounded px-2 py-1">
+              Cette tournée a été conduite par <strong>{{ equipeSuggestion.chauffeur_nom_excel }}</strong>, pas par {{ selectedVehicule?.chauffeur }}.
+              Vérifie avant de reprendre l'équipage.
             </div>
             <div class="flex flex-wrap gap-2">
-              <span v-if="equipeSuggestion.ripeur1_nom" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-blue-200 rounded-lg text-xs font-medium text-gray-800">
-                <div class="w-5 h-5 rounded-full bg-blue-600 flex items-center justify-center text-white text-[10px] font-bold">{{ equipeSuggestion.ripeur1_nom.charAt(0) }}</div>
+              <span v-if="equipeSuggestion.ripeur1_nom" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white border rounded-lg text-xs font-medium text-gray-800"
+                :class="equipeSuggestion.source === 'EXCEL_RH' ? 'border-amber-200' : 'border-blue-200'">
+                <div class="w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-bold"
+                  :class="equipeSuggestion.source === 'EXCEL_RH' ? 'bg-amber-600' : 'bg-blue-600'">
+                  {{ equipeSuggestion.ripeur1_nom.charAt(0) }}
+                </div>
                 {{ equipeSuggestion.ripeur1_nom }}
+                <span class="font-mono text-[10px] text-gray-400">{{ equipeSuggestion.ripeur1_matricule }}</span>
               </span>
-              <span v-if="equipeSuggestion.ripeur2_nom" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-blue-200 rounded-lg text-xs font-medium text-gray-800">
-                <div class="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center text-white text-[10px] font-bold">{{ equipeSuggestion.ripeur2_nom.charAt(0) }}</div>
+              <span v-if="equipeSuggestion.ripeur2_nom" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white border rounded-lg text-xs font-medium text-gray-800"
+                :class="equipeSuggestion.source === 'EXCEL_RH' ? 'border-amber-200' : 'border-blue-200'">
+                <div class="w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-bold"
+                  :class="equipeSuggestion.source === 'EXCEL_RH' ? 'bg-amber-500' : 'bg-blue-500'">
+                  {{ equipeSuggestion.ripeur2_nom.charAt(0) }}
+                </div>
                 {{ equipeSuggestion.ripeur2_nom }}
+                <span class="font-mono text-[10px] text-gray-400">{{ equipeSuggestion.ripeur2_matricule }}</span>
               </span>
-              <span v-if="equipeSuggestion.ripeur3_nom" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-blue-200 rounded-lg text-xs font-medium text-gray-800">
-                <div class="w-5 h-5 rounded-full bg-blue-400 flex items-center justify-center text-white text-[10px] font-bold">{{ equipeSuggestion.ripeur3_nom.charAt(0) }}</div>
+              <span v-if="equipeSuggestion.ripeur3_nom" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white border rounded-lg text-xs font-medium text-gray-800"
+                :class="equipeSuggestion.source === 'EXCEL_RH' ? 'border-amber-200' : 'border-blue-200'">
+                <div class="w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-bold"
+                  :class="equipeSuggestion.source === 'EXCEL_RH' ? 'bg-amber-400' : 'bg-blue-400'">
+                  {{ equipeSuggestion.ripeur3_nom.charAt(0) }}
+                </div>
                 {{ equipeSuggestion.ripeur3_nom }}
+                <span class="font-mono text-[10px] text-gray-400">{{ equipeSuggestion.ripeur3_matricule }}</span>
               </span>
               <span v-if="equipeSuggestion.circuit" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-600">
                 <Route class="w-3.5 h-3.5 text-gray-400" /> {{ equipeSuggestion.circuit }}
               </span>
             </div>
             <button type="button" @click="appliquerEquipe(equipeSuggestion)"
-              class="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-colors cursor-pointer">
+              class="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-white text-sm font-semibold rounded-xl transition-colors cursor-pointer"
+              :class="equipeSuggestion.source === 'EXCEL_RH' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-blue-600 hover:bg-blue-700'">
               <Users class="w-4 h-4" /> Reprendre cette équipe
             </button>
           </div>
@@ -665,19 +935,68 @@ function submit() {
               </div>
               <div>
                 <h3 class="text-sm font-semibold text-gray-900">Ripeurs + Circuit</h3>
-                <p class="text-xs text-gray-500">Saisie manuelle — les chauffeurs sont exclus de la liste</p>
+                <p class="text-xs text-gray-500">
+                  <template v-if="ripeursVerrouilles">🔒 Verrouillé sur l'Excel RH (saisie historique)</template>
+                  <template v-else>Saisie manuelle — les chauffeurs sont exclus de la liste</template>
+                </p>
               </div>
+            </div>
+
+            <!-- Bannière chauffeur suspect (Excel RH non fiable) -->
+            <div v-if="chauffeurSuspect" class="p-3 bg-red-50 border border-red-300 rounded-xl">
+              <div class="flex items-start gap-2">
+                <span class="text-red-600 text-base leading-none">⚠</span>
+                <div class="text-xs text-red-900 space-y-0.5">
+                  <p class="font-semibold">Chauffeur signalé — Excel RH non fiable pour ce cas</p>
+                  <p>
+                    <strong>{{ chauffeurSuspect.nom }}</strong> apparaît sur
+                    <strong>{{ chauffeurSuspect.vehicules_distincts }} véhicules</strong> en
+                    <strong>{{ chauffeurSuspect.jours_distincts }} jours</strong> dans l'Excel d'évaluation.
+                  </p>
+                  <p>
+                    👉 Seules les données du <strong>pont-bascule WinStar</strong> sont fiables ici.
+                    La suggestion automatique d'équipage est désactivée — saisie manuelle obligatoire.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Bannière verrouillage historique -->
+            <div v-if="isDateHistorique && verrouillageLoading" class="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+              <Loader2 class="w-4 h-4 text-amber-600 animate-spin" />
+              <span class="text-xs text-amber-800">Chargement de l'équipage Excel RH pour cette date...</span>
+            </div>
+            <div v-if="ripeursVerrouilles" class="p-3 bg-amber-50 border border-amber-300 rounded-xl">
+              <div class="flex items-start gap-2">
+                <span class="text-amber-700 text-base leading-none">🔒</span>
+                <div class="text-xs text-amber-900 space-y-0.5">
+                  <p class="font-semibold">Saisie historique — équipage figé d'après l'Excel RH</p>
+                  <p>
+                    La date sélectionnée ({{ date.split('-').reverse().join('/') }}) est antérieure à {{ SEUIL_VERROUILLAGE_JOURS }} jours.
+                    L'équipage et le circuit sont importés automatiquement et ne peuvent plus être modifiés.
+                  </p>
+                  <p v-if="equipageVerrouille?.poste" class="text-amber-700">
+                    Poste : <strong>{{ equipageVerrouille.poste }}</strong>
+                    · Affectation : <strong>{{ equipageVerrouille.affectation || '—' }}</strong>
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div v-if="isDateHistorique && verrouillageMessage" class="p-3 bg-red-50 border border-red-300 rounded-xl text-xs text-red-800">
+              ⚠ {{ verrouillageMessage }}
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
               <AgentSearchInput v-model="ripeur1Matricule" :date="date" :filter-presents="false"
                 exclude-role="CHAUFFEUR"
-                label="Ripeur 1 (obligatoire)" placeholder="Rechercher un ripeur..." required
+                label="Ripeur 1 (obligatoire)" placeholder="Rechercher un ripeur..." :required="!ripeursVerrouilles"
+                :disabled="ripeursVerrouilles" :locked-reason="lockReason"
                 @agent-selected="(a) => selectedRipeur1 = a" />
               <div>
                 <AgentSearchInput v-model="ripeur2Matricule" :date="date" :filter-presents="false"
                   exclude-role="CHAUFFEUR"
                   label="Ripeur 2 (optionnel)" placeholder="Rechercher un ripeur..."
+                  :disabled="ripeursVerrouilles" :locked-reason="lockReason"
                   @agent-selected="(a) => selectedRipeur2 = a" />
                 <p class="text-[11px] text-gray-400 mt-1.5">Optionnel</p>
               </div>
@@ -685,6 +1004,7 @@ function submit() {
                 <AgentSearchInput v-model="ripeur3Matricule" :date="date" :filter-presents="false"
                   exclude-role="CHAUFFEUR"
                   label="Ripeur 3 (optionnel)" placeholder="Rechercher un ripeur..."
+                  :disabled="ripeursVerrouilles" :locked-reason="lockReason"
                   @agent-selected="(a) => selectedRipeur3 = a" />
                 <p class="text-[11px] text-gray-400 mt-1.5">Optionnel</p>
               </div>
@@ -697,7 +1017,13 @@ function submit() {
               </label>
               <input v-model="circuitSaisi" type="text"
                 :placeholder="selectedVehicule?.origine || 'Ex: 1er Arrondissement, Akébé, PK5...'"
-                class="block w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-colors" />
+                :readonly="ripeursVerrouilles"
+                :class="[
+                  'block w-full px-4 py-2.5 border rounded-xl text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-colors',
+                  ripeursVerrouilles
+                    ? 'bg-amber-50 border-amber-300 cursor-not-allowed'
+                    : 'bg-gray-50 border-gray-200 focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20'
+                ]" />
             </div>
           </div>
 

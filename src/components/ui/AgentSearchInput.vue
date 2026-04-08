@@ -12,6 +12,8 @@ const props = defineProps({
   label: { type: String, default: 'Agent (Matricule ou Nom)' },
   required: { type: Boolean, default: false },
   placeholder: { type: String, default: 'Tapez un matricule ou un nom...' },
+  disabled: { type: Boolean, default: false },
+  lockedReason: { type: String, default: '' },
 })
 
 const emit = defineEmits(['update:modelValue', 'agent-selected'])
@@ -125,9 +127,12 @@ onBeforeUnmount(() => document.removeEventListener('click', handleClickOutside))
     </label>
 
     <!-- Agent sélectionné -->
-    <div v-if="selectedAgent" class="flex items-center justify-between gap-3 px-4 py-2.5 bg-emerald-50 border border-emerald-200 rounded-xl">
+    <div v-if="selectedAgent"
+      class="flex items-center justify-between gap-3 px-4 py-2.5 border rounded-xl"
+      :class="disabled ? 'bg-amber-50 border-amber-300' : 'bg-emerald-50 border-emerald-200'">
       <div class="flex items-center gap-3 min-w-0">
-        <div class="w-8 h-8 rounded-full bg-emerald-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+        <div class="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+          :class="disabled ? 'bg-amber-600' : 'bg-emerald-600'">
           {{ selectedAgent.nom.charAt(0) }}
         </div>
         <div class="min-w-0">
@@ -137,20 +142,29 @@ onBeforeUnmount(() => document.removeEventListener('click', handleClickOutside))
               <Hash class="w-3 h-3" />
               {{ selectedAgent.matricule }}
             </span>
-            <span class="text-gray-300">|</span>
-            <span>{{ selectedAgent.role }}</span>
-            <span class="text-gray-300">|</span>
-            <span>{{ selectedAgent.zone }}</span>
+            <span v-if="selectedAgent.role" class="text-gray-300">|</span>
+            <span v-if="selectedAgent.role">{{ selectedAgent.role }}</span>
+            <span v-if="selectedAgent.zone" class="text-gray-300">|</span>
+            <span v-if="selectedAgent.zone">{{ selectedAgent.zone }}</span>
           </div>
+          <p v-if="disabled && lockedReason" class="text-[10px] text-amber-700 font-medium mt-0.5">🔒 {{ lockedReason }}</p>
         </div>
       </div>
       <button
+        v-if="!disabled"
         type="button"
         @click="clearSelection"
         class="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors flex-shrink-0"
       >
         <X class="w-4 h-4" />
       </button>
+    </div>
+
+    <!-- Champ verrouillé sans agent sélectionné (cas rare) -->
+    <div v-else-if="disabled"
+      class="flex items-center gap-3 px-4 py-2.5 bg-gray-100 border border-gray-200 rounded-xl text-sm text-gray-500">
+      <Search class="w-4 h-4 text-gray-400" />
+      <span>Aucun agent (champ verrouillé)</span>
     </div>
 
     <!-- Champ de recherche -->
